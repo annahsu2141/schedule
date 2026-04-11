@@ -1858,8 +1858,45 @@ dvDate=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1);
 loadHolidayInput();
 buildTechFilters();renderAll();renderDayView();renderWorkload();
 setTimeout(function(){fbListen(month);},1000);
+} else {
+// localStorage 沒資料 → 嘗試從 Firebase 抓
+setTimeout(function(){fbFetchOnce();},800);
 }
 })();
+
+function fbFetchOnce(){
+var fb=window._fb;
+if(!fb||!fb.ready)return;
+var month=document.getElementById('target-month').value;
+var syncEl=document.getElementById('sync-status');
+syncEl.style.display='flex';syncEl.style.color='var(--text3)';syncEl.style.borderColor='var(--border)';
+syncEl.innerHTML='☁️ 從雲端載入中…';
+var dbRef=fb.ref(fb.db,'schedules/'+month.replace('-','_'));
+fb.onValue(dbRef,function(snapshot){
+var data=snapshot.val();
+if(!data||!data.schedule||!data.schedule.length){
+syncEl.innerHTML='📭 雲端無資料';
+setTimeout(function(){syncEl.style.display='none';},3000);
+return;
+}
+schedule=data.schedule;
+excluded=new Set(data.excluded||[]);
+for(var i=0;i<schedule.length;i++)schedule[i].color=getTechColor(schedule[i].technician||'');
+try{localStorage.setItem('schedule_'+month,JSON.stringify(data));}catch(e){}
+var parts=month.split('-');
+dvDate=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1);
+document.getElementById('hint').style.display='none';
+document.getElementById('main-table').style.display='table';
+document.getElementById('save-btn').style.display='inline-flex';
+loadHolidayInput();
+buildTechFilters();renderAll();renderDayView();renderWorkload();
+syncEl.innerHTML='✅ 雲端資料載入完成';syncEl.style.color='var(--green)';syncEl.style.borderColor='rgba(21,128,61,.3)';
+setTimeout(function(){syncEl.style.display='none';},3000);
+// 之後繼續監聽即時更新
+_fbListening=false;
+fbListen(month);
+},{onlyOnce:true});
+}
 </script>
 
 </body>
