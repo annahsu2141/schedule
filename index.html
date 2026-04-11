@@ -6,6 +6,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <title>防治排班系統</title>
+<!-- ═══════════════════════════════════════════════════════
+     Firebase 設定區 — 請填入你自己的 Firebase 專案資料
+     ═══════════════════════════════════════════════════════ -->
+<script type="module" id="firebase-init">
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDjiZ6OUKPBdWQRemlmQQ2NLziidzi69JE",
+  authDomain:        "pest-schedule.firebaseapp.com",
+  databaseURL:       "https://pest-schedule-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "pest-schedule",
+  storageBucket:     "pest-schedule.firebasestorage.app",
+  messagingSenderId: "796886986735",
+  appId:             "1:796886986735:web:737daa1f333ecfcb06101a"
+};
+// ═══════════════════════════════════════════════════════
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const _configured = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+window._fb = { ready: false, configured: _configured };
+
+if(_configured){
+  try{
+    const app = initializeApp(FIREBASE_CONFIG);
+    const db  = getDatabase(app);
+    window._fb.db  = db;
+    window._fb.ref = ref;
+    window._fb.set = set;
+    window._fb.onValue = onValue;
+    window._fb.serverTimestamp = serverTimestamp;
+    window._fb.ready = true;
+    console.log('[Firebase] 初始化成功');
+  }catch(e){
+    console.warn('[Firebase] 初始化失敗', e);
+  }
+}
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
 :root{--bg:#f8f9fa;--surface:#ffffff;--surface2:#f0f2f5;--border:#e5e7eb;--accent:#2563a8;--accent2:#7c3aed;--green:#15803d;--orange:#c2610a;--red:#c81e3a;--yellow:#b45309;--text:#1a2540;--text2:#4b5563;--text3:#9ca3af;}
@@ -283,6 +321,7 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 <button class="btn btn-ghost" onclick="undo()" id="undo-btn" style="display:none" title="復原上一步 (Ctrl+Z)">⎌ 復原</button>
 <button class="btn btn-success" onclick="saveSchedule()" id="save-btn" style="display:none">💾 儲存排班</button>
 <div id="save-status" style="font-size:10px;color:#15803d;display:none;align-items:center;gap:4px;"></div>
+<div id="sync-status" style="font-size:10px;display:none;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);"></div>
 <div class="stat-chips">
 <div class="stat-chip">總數<span id="s-total">—</span></div>
 <div class="stat-chip">發送<span id="s-bot">—</span></div>
@@ -694,6 +733,8 @@ document.getElementById('main-table').style.display='table';
 document.getElementById('save-btn').style.display='inline-flex';
 loadHolidayInput();
 buildTechFilters();renderAll();renderDayView();renderWorkload();
+// 啟動 Firebase 即時監聽
+setTimeout(function(){fbListen(document.getElementById('target-month').value);},1000);
 var colInfo='日期欄：'+headerRow[colDate]+(colTech>=0?'　防治師欄：'+headerRow[colTech]:'')+(colTime>=0?'　時間欄：'+headerRow[colTime]:'');
 alert('✅ 匯入成功！共 '+newSchedule.length+' 筆排班\n（'+colInfo+'）');
 }catch(err){
@@ -746,13 +787,59 @@ document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key
 function autoSave(){
 var month=document.getElementById('target-month').value;
 if(!month||!schedule.length)return;
-try{
 var data={schedule:schedule,excluded:Array.from(excluded),month:month,savedAt:new Date().toLocaleString('zh-TW')};
-localStorage.setItem('schedule_'+month,JSON.stringify(data));
-var s=document.getElementById('save-status');s.style.display='flex';s.innerHTML='✅ 自動儲存 '+data.savedAt;
-setTimeout(function(){s.style.display='none';},2000);
-}catch(e){}
+// 1. localStorage（離線備用）
+try{localStorage.setItem('schedule_'+month,JSON.stringify(data));}catch(e){}
+// 2. Firebase（雲端同步）
+fbSave(month,data);
 }
+
+function fbSave(month,data){
+var fb=window._fb;
+if(!fb||!fb.ready)return;
+var syncEl=document.getElementById('sync-status');
+syncEl.style.display='flex';syncEl.style.color='var(--text3)';syncEl.style.borderColor='var(--border)';syncEl.innerHTML='⏳ 同步中…';
+try{
+var dbRef=fb.ref(fb.db,'schedules/'+month.replace('-','_'));
+fb.set(dbRef,{...data,_ts:Date.now()}).then(function(){
+syncEl.innerHTML='☁️ 已同步';syncEl.style.color='var(--green)';syncEl.style.borderColor='rgba(21,128,61,.3)';
+setTimeout(function(){syncEl.style.display='none';},3000);
+}).catch(function(e){
+syncEl.innerHTML='⚠️ 同步失敗';syncEl.style.color='var(--red)';syncEl.style.borderColor='rgba(200,30,58,.3)';
+console.warn('[Firebase] 寫入失敗',e);
+});
+}catch(e){syncEl.style.display='none';}
+}
+
+// Firebase 即時監聽（其他人修改時自動更新）
+var _fbListening=false;
+var _fbIgnoreNext=false;// 自己儲存後忽略下一次推送
+function fbListen(month){
+var fb=window._fb;
+if(!fb||!fb.ready||_fbListening)return;
+_fbListening=true;
+var dbRef=fb.ref(fb.db,'schedules/'+month.replace('-','_'));
+fb.onValue(dbRef,function(snapshot){
+var data=snapshot.val();
+if(!data||!data.schedule)return;
+if(_fbIgnoreNext){_fbIgnoreNext=false;return;}
+// 比對時間戳，只在遠端比本地新時才更新
+var localRaw=null;try{localRaw=JSON.parse(localStorage.getItem('schedule_'+month)||'null');}catch(e){}
+var localTs=localRaw&&localRaw._ts?localRaw._ts:0;
+if(data._ts&&data._ts<=localTs)return;
+// 遠端較新，更新本地
+schedule=data.schedule;
+excluded=new Set(data.excluded||[]);
+for(var i=0;i<schedule.length;i++)schedule[i].color=getTechColor(schedule[i].technician||'');
+try{localStorage.setItem('schedule_'+month,JSON.stringify(data));}catch(e){}
+buildTechFilters();renderAll();renderDayView();renderWorkload();
+var syncEl=document.getElementById('sync-status');
+syncEl.style.display='flex';syncEl.style.color='var(--accent)';syncEl.style.borderColor='rgba(37,99,168,.3)';
+syncEl.innerHTML='🔄 已從雲端更新';
+setTimeout(function(){syncEl.style.display='none';},3000);
+});
+}
+
 function loadSavedSchedule(month){
 try{
 var raw=localStorage.getItem('schedule_'+month);
@@ -1770,6 +1857,7 @@ var parts=month.split('-');
 dvDate=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1);
 loadHolidayInput();
 buildTechFilters();renderAll();renderDayView();renderWorkload();
+setTimeout(function(){fbListen(month);},1000);
 }
 })();
 </script>
