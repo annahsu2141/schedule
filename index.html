@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
-<title>防治排班系統</title>
+<title>防治排班系統 v3.0</title>
 <!-- ═══════════════════════════════════════════════════════
      Firebase 設定區 — 請填入你自己的 Firebase 專案資料
      ═══════════════════════════════════════════════════════ -->
@@ -128,9 +128,13 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 .today-btn{background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text2);cursor:pointer;padding:5px 10px;font-size:11px;font-family:'Noto Sans TC',sans-serif;}
 .today-btn:hover{border-color:var(--accent);color:var(--accent);}
 .holiday-input-wrap{display:flex;align-items:center;gap:6px;margin-left:4px;}
-.holiday-input-wrap label{font-size:10px;color:var(--text3);white-space:nowrap;}
-.holiday-input-wrap input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;outline:none;font-family:'DM Mono',monospace;width:200px;}
-.holiday-input-wrap input:focus{border-color:var(--orange);}
+.hm-day{border-radius:5px;padding:4px 2px;font-size:11px;text-align:center;cursor:pointer;border:1px solid transparent;transition:all .12s;font-family:'DM Mono',monospace;line-height:1.3;}
+.hm-day:hover{background:var(--surface2);}
+.hm-day.selected{background:rgba(194,97,10,.15);border-color:var(--orange);color:var(--orange);font-weight:500;}
+.hm-day.is-weekend{color:var(--text3);}
+.hm-day.is-holiday{color:var(--red);}
+.hm-day.empty{cursor:default;}
+.hm-weekday-hdr{font-size:9px;text-align:center;color:var(--text3);padding:2px 0;}
 .conflict-bar{background:rgba(200,30,58,.1);border:1px solid rgba(200,30,58,.3);border-radius:7px;padding:6px 12px;margin:6px 14px 0;font-size:11px;color:var(--red);display:none;align-items:center;gap:6px;flex-wrap:wrap;}
 .conflict-bar.show{display:flex;}
 .dv-grid{display:flex;flex:1;overflow:hidden;}
@@ -226,7 +230,8 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 .wv-th-day.holiday{background:rgba(200,30,58,.07);color:var(--red);}
 .wv-cell{border:1px solid var(--border);padding:3px;vertical-align:top;min-height:52px;position:relative;background:#fff;}
 .wv-cell.holiday-col{background:rgba(200,30,58,.03);}
-.wv-cell.tech-label{background:var(--surface2);font-size:11px;font-weight:400;text-align:center;color:var(--text2);padding:4px 2px;position:sticky;left:0;z-index:5;}
+.wv-cell.tech-label{background:var(--surface2);font-size:11px;font-weight:600;text-align:center;color:var(--text);padding:4px 2px;position:sticky;left:0;z-index:5;border-top:2px solid var(--border);}
+.wv-table tbody tr{border-top:2.5px solid var(--border);}
 .wv-cell.on-hol{background:rgba(194,97,10,.05);}
 .wv-job{border-radius:4px;padding:2px 5px;margin-bottom:2px;font-size:10px;cursor:grab;border-left:3px solid;line-height:1.3;transition:filter .12s,opacity .15s;position:relative;}
 .wv-job:hover{filter:brightness(1.08);}
@@ -268,6 +273,24 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 <button class="btn btn-ghost" onclick="closeTechDropdown()">取消</button>
 </div>
 </div>
+<!-- 休假管理 popup -->
+<div id="holiday-mgr" style="display:none;position:fixed;z-index:1001;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.15);min-width:340px;max-width:95vw;" onclick="event.stopPropagation()">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<div style="font-size:13px;font-weight:500;">🏖️ 休假管理</div>
+<button onclick="closeHolidayMgr()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3);">✕</button>
+</div>
+<!-- 防治師選擇 -->
+<div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">選擇防治師</div>
+<div id="hm-tech-list" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;"></div>
+<!-- 月曆 -->
+<div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">點選休假日期</div>
+<div id="hm-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;"></div>
+<div style="display:flex;gap:8px;margin-top:12px;">
+<button class="btn btn-primary" onclick="confirmHolidayMgr()" style="flex:1;justify-content:center;">✓ 確認</button>
+<button class="btn btn-ghost" onclick="closeHolidayMgr()" style="justify-content:center;">取消</button>
+</div>
+</div>
+
 <div id="move-popup" onclick="event.stopPropagation()">
 <h4>📅 移動案場</h4>
 <div class="move-name" id="move-name"></div>
@@ -311,15 +334,15 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 </div>
 
 <header>
-<div class="logo"><div class="logo-icon">🦟</div>防治排班系統</div>
+<div class="logo"><div class="logo-icon">🦟</div>防治排班系統<span style="font-size:9px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-left:4px;">v3.0</span></div>
 <input type="hidden" id="target-month" value="2026-05">
-<label class="btn btn-primary" style="cursor:pointer;" title="匯入Excel行程明細（以F欄日期為準）">
-📥 匯入 Excel 排班
-<input type="file" id="import-file" accept=".xlsx" style="display:none" onchange="importExcel(this)">
-</label>
+<button class="btn btn-primary" onclick="openMonthPicker()">🗓 產生排班</button>
+<button class="btn btn-ghost" onclick="copyNextMonth()">📋 複製下月班表</button>
 <button class="btn btn-ghost" onclick="resetExclusions()">↩ 重設排除</button>
 <button class="btn btn-ghost" onclick="undo()" id="undo-btn" style="display:none" title="復原上一步 (Ctrl+Z)">⎌ 復原</button>
 <button class="btn btn-success" onclick="saveSchedule()" id="save-btn" style="display:none">💾 儲存排班</button>
+<button class="btn btn-ghost" onclick="downloadSchedule()" id="download-btn" style="display:none" title="下載排班 JSON">⬇️ 下載排班</button>
+<label class="btn btn-ghost" style="cursor:pointer;" title="載入排班 JSON">📂 載入排班<input type="file" accept=".json" style="display:none" onchange="loadScheduleFile(this)"></label>
 <div id="save-status" style="font-size:10px;color:#15803d;display:none;align-items:center;gap:4px;"></div>
 <div id="sync-status" style="font-size:10px;display:none;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);"></div>
 <div class="stat-chips">
@@ -388,8 +411,8 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 <button class="today-btn" onclick="goToday()">今天</button>
 <div class="stat-chip" style="margin-left:6px">案場<span id="dv-job-count">0</span></div>
 <div class="holiday-input-wrap">
-<label>🏖️ 休假（例：Ivan:5/15,5/16 HB:5/20）</label>
-<input type="text" id="holiday-input" placeholder="防治師:月/日,月/日 ..." oninput="saveHolidayInput();renderDayView()">
+<input type="hidden" id="holiday-input">
+<button class="btn btn-ghost" onclick="openHolidayMgr()" style="font-size:12px;">🏖️ 休假管理</button>
 </div>
 </div>
 <div class="conflict-bar" id="conflict-bar"></div>
@@ -516,6 +539,101 @@ return Math.max(420,Math.min(1380,min));// 限制 07:00~23:00
 }
 function totalW(){return minToX(1440);}
 
+// ── 休假管理 ──
+var hmSelectedTech=null;
+var hmSelectedDates={};// tech -> Set of iso strings
+
+function openHolidayMgr(){
+var popup=document.getElementById('holiday-mgr');
+// 解析現有 holiday-input 資料
+hmSelectedDates={};
+var parsed=parseHolidayInput();
+for(var t in parsed){
+hmSelectedDates[t]=new Set(parsed[t]);
+}
+// 預設選第一位防治師
+hmSelectedTech=TECH_ORDER[0];
+renderHmTechList();
+renderHmCalendar();
+popup.style.display='block';
+// 置中顯示
+popup.style.top='50%';popup.style.left='50%';
+popup.style.transform='translate(-50%,-50%)';
+}
+function closeHolidayMgr(){
+document.getElementById('holiday-mgr').style.display='none';
+}
+function renderHmTechList(){
+var list=document.getElementById('hm-tech-list');list.innerHTML='';
+TECH_ORDER.forEach(function(tn){
+var tc=TECH_COLORS[tn]||DEF_COLOR;
+var btn=document.createElement('button');
+btn.className='btn';
+btn.style.cssText='font-size:11px;padding:3px 10px;border-radius:5px;border:1.5px solid '+(hmSelectedTech===tn?tc.border:'var(--border)')+';background:'+(hmSelectedTech===tn?tc.bg:'var(--surface2)')+';color:'+(hmSelectedTech===tn?tc.text:'var(--text2)')+';cursor:pointer;';
+// 有休假的顯示數量
+var cnt=hmSelectedDates[tn]?hmSelectedDates[tn].size:0;
+btn.textContent=tn+(cnt>0?' ('+cnt+')':'');
+btn.onclick=(function(t){return function(){hmSelectedTech=t;renderHmTechList();renderHmCalendar();};})(tn);
+list.appendChild(btn);
+});
+}
+function renderHmCalendar(){
+var cal=document.getElementById('hm-calendar');cal.innerHTML='';
+var month=document.getElementById('target-month').value;
+if(!month)return;
+var parts=month.split('-');var y=parseInt(parts[0]);var m=parseInt(parts[1]);
+var firstDay=new Date(y,m-1,1).getDay();// 0=日
+var daysInMonth=new Date(y,m,0).getDate();
+var WDS=['日','一','二','三','四','五','六'];
+WDS.forEach(function(w){
+var hdr=document.createElement('div');hdr.className='hm-weekday-hdr';hdr.textContent=w;cal.appendChild(hdr);
+});
+// 空格
+for(var i=0;i<firstDay;i++){var empty=document.createElement('div');empty.className='hm-day empty';cal.appendChild(empty);}
+var techDates=hmSelectedDates[hmSelectedTech]||(hmSelectedDates[hmSelectedTech]=new Set());
+for(var d=1;d<=daysInMonth;d++){
+var date=new Date(y,m-1,d);var dow=date.getDay();
+var iso=toISO(date);
+var dayEl=document.createElement('div');
+var isWknd=dow===0||dow===6;var isHol=isHolidayTW(iso);
+var isSel=techDates.has(iso);
+dayEl.className='hm-day'+(isWknd?' is-weekend':'')+(isHol?' is-holiday':'')+(isSel?' selected':'');
+dayEl.textContent=d;
+dayEl.title=iso;
+(function(iso2,el){
+el.onclick=function(){
+if(techDates.has(iso2)){techDates.delete(iso2);el.classList.remove('selected');}
+else{techDates.add(iso2);el.classList.add('selected');}
+renderHmTechList();// 更新數量
+};
+})(iso,dayEl);
+cal.appendChild(dayEl);
+}
+}
+function confirmHolidayMgr(){
+// 把 hmSelectedDates 轉回文字格式存入 hidden input
+var parts2=[];
+var month=document.getElementById('target-month').value;
+var mp=month.split('-');var y=parseInt(mp[0]);
+TECH_ORDER.forEach(function(tn){
+var dates=hmSelectedDates[tn];
+if(!dates||dates.size===0)return;
+var sorted=Array.from(dates).sort();
+var fmtDates=sorted.map(function(iso){
+var p=iso.split('-');return parseInt(p[1])+'/'+parseInt(p[2]);
+});
+parts2.push(tn+':'+fmtDates.join(','));
+});
+document.getElementById('holiday-input').value=parts2.join(' ');
+saveHolidayInput();
+closeHolidayMgr();
+renderDayView();
+}
+document.addEventListener('click',function(e){
+var p=document.getElementById('holiday-mgr');
+if(p&&p.style.display==='block'&&!p.contains(e.target)&&!e.target.closest('.btn'))closeHolidayMgr();
+});
+
 function saveHolidayInput(){
 var val=document.getElementById('holiday-input').value;
 var month=document.getElementById('target-month').value||'';
@@ -565,8 +683,8 @@ for(var a=0;a<jobs.length;a++){
 for(var b=a+1;b<jobs.length;b++){
 // 同一案場（同 si）：不算衝堂
 if(jobs[a].si===jobs[b].si)continue;
-// 同客戶名稱 + 時間完全相同：Excel 多位防治師分列的同一案場，不算衝堂
-if(jobs[a].name===jobs[b].name&&jobs[a].s===jobs[b].s&&jobs[a].e===jobs[b].e)continue;
+// 同客戶名稱（同一案場多位防治師）：不算衝堂
+if(jobs[a].name===jobs[b].name)continue;
 if(jobs[a].s<jobs[b].e&&jobs[b].s<jobs[a].e){
 conflictSet[jobs[a].si+'|'+jobs[a].di]=1;
 conflictSet[jobs[b].si+'|'+jobs[b].di]=1;
@@ -994,22 +1112,12 @@ var row=schedule[popupTarget.idx];
 var y=parseInt(document.getElementById('target-month').value.split('-')[0]);
 var nd=parseDate(raw,y);
 if(nd){
-// 同步同案場所有分列的日期
-var oldDs=row.dates[popupTarget.di].dateStr;
-var oldS=row.startMin;var oldE=row.startMin+row.duration;
 var newTime=document.getElementById('popup-time-input').value.trim();
 var newStartMin=row.startMin;
 if(newTime&&/\d{1,2}:\d{2}/.test(newTime)){var tp2=newTime.split(':');newStartMin=parseInt(tp2[0])*60+(parseInt(tp2[1])||0);}
-for(var i=0;i<schedule.length;i++){
-var r=schedule[i];if(r.name!==row.name)continue;
-for(var d2=0;d2<r.dates.length;d2++){
-if(r.dates[d2].dateStr===oldDs&&r.startMin===oldS&&(r.startMin+r.duration)===oldE){
-r.dates[d2].dateStr=nd;
-if(newTime&&/\d{1,2}:\d{2}/.test(newTime)){r.start_time=newTime;r.startMin=newStartMin;}
-r.modified=true;
-}
-}
-}
+row.dates[popupTarget.di].dateStr=nd;
+if(newTime&&/\d{1,2}:\d{2}/.test(newTime)){row.start_time=newTime;row.startMin=newStartMin;}
+row.modified=true;
 renderAll();renderDayView();pushUndo();autoSave();
 }else alert('格式錯誤，請輸入如 5/15');
 closePopup();
@@ -1401,13 +1509,67 @@ document.getElementById('move-time').value=row.start_time||'';
 var dateInp=document.getElementById('move-date');var timeInp=document.getElementById('move-time');
 dateInp.readOnly=false;dateInp.style.opacity='1';dateInp.style.cursor='';
 timeInp.readOnly=false;timeInp.style.opacity='1';timeInp.style.cursor='';
-// 找出同一案場所有分列記錄的防治師
 var allTechs=getSiblingTechs(si,di);
 buildMoveTechList(allTechs);
 var cs=detectConflicts();var isConflict=!!cs[si+'|'+di];
 var cw=document.getElementById('conflict-warn');
 if(isConflict){cw.style.display='block';cw.textContent='⚠️ 此案場與同防治師其他案場時間重疊！';}else cw.style.display='none';
-document.getElementById('available-techs-section').style.display='none';
+
+// 建議可替換防治師（有衝堂時顯示）
+var availSection=document.getElementById('available-techs-section');
+var availList=document.getElementById('available-techs-list');
+if(isConflict){
+var startMin=row.startMin;var endMin=row.startMin+row.duration;
+var region=row.region||'北';
+var targetRegion=region==='北'?'北':(row.area&&(row.area.indexOf('高雄')>=0||row.area.indexOf('台南')>=0||row.area.indexOf('屏東')>=0||row.area.indexOf('嘉義')>=0)?'南':'中');
+// 統計當天各防治師工作狀況
+var techDayJobs={};
+for(var i=0;i<schedule.length;i++){
+var r=schedule[i];var rTechs=r.technician.split(',');
+for(var di2=0;di2<r.dates.length;di2++){
+if(r.dates[di2].dateStr!==ds)continue;
+for(var ti=0;ti<rTechs.length;ti++){
+var t=rTechs[ti].trim();if(!t)continue;
+if(!techDayJobs[t])techDayJobs[t]={count:0,overlap:false};
+techDayJobs[t].count++;
+if(r.startMin<endMin&&(r.startMin+r.duration)>startMin)techDayJobs[t].overlap=true;
+}
+}
+}
+var availTechs=[];
+for(var ti=0;ti<TECH_ORDER.length;ti++){
+var tn=TECH_ORDER[ti];
+if(allTechs.indexOf(tn)>=0)continue;// 已是此案場人員
+var techR=TECH_REGION[tn]||'北';if(techR!==targetRegion)continue;
+var dayInfo=techDayJobs[tn]||{count:0,overlap:false};
+if(dayInfo.overlap)continue;// 時間衝突
+availTechs.push({tech:tn,count:dayInfo.count,group:TECH_GROUP[tn]||'主力'});
+}
+availTechs.sort(function(a,b){return a.group==='主力'?-1:1;});
+if(availTechs.length>0){
+availSection.style.display='block';availList.innerHTML='';
+availTechs.forEach(function(at){
+var tc=TECH_COLORS[at.tech]||DEF_COLOR;
+var tag=document.createElement('span');
+tag.className='avail-tech-tag';
+tag.style.background=tc.bg;tag.style.borderColor=tc.border;tag.style.color=tc.text;
+tag.textContent=at.tech+(at.count>0?' ('+at.count+'場)':'')+(at.group==='備援'?' 備':'');
+tag.onclick=(function(tn2){return function(){
+// 點擊建議人選 → 勾選該防治師
+document.querySelectorAll('#move-tech-list input[type=checkbox]').forEach(function(cb){
+cb.checked=(cb.value===tn2);
+var lbl=cb.parentElement;var isChecked=cb.checked;var val=cb.value;var tc2=TECH_COLORS[val]||DEF_COLOR;
+lbl.classList.toggle('selected',isChecked);
+lbl.style.borderColor=isChecked?tc2.border:'';lbl.style.background=isChecked?tc2.bg:'';lbl.style.color=isChecked?tc2.text:'';
+});
+};})(at.tech);
+availList.appendChild(tag);
+});
+}else availSection.style.display='none';
+}else{
+availSection.style.display='none';
+}
+
 var popup=document.getElementById('move-popup');popup.style.display='block';
 popup.style.left=Math.min(e.clientX,window.innerWidth-290)+'px';popup.style.top=Math.min(e.clientY+8,window.innerHeight-280)+'px';
 }
@@ -1712,12 +1874,19 @@ var tdLabel=document.createElement('td');tdLabel.className='wv-cell tech-label';
 tdLabel.style.borderLeft='3px solid '+tc.border;tr.appendChild(tdLabel);
 
 // 每天的欄位
+var TEAPOT_IMG='<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAIIUlEQVR42r1XW2ycxRX+zsz8/97sXd+SJY6d2CQilh1CoUIiLQWXq8gDaSqte6UVL1BVVdUnSh+Q7Zeqfal6kaq2Uh9Q1Rdc8QKiFFCyIY1bAiYJyebCxXGyCfba3vV6d//d/f9/Zk4fbENLcWKrqEcazcvRzKfvm3PON8AN4rlMRjJAR5/+9q8P/+Q7H7zx7G86AYAZhM8gxI0StgwOEgHct2ew8+7b9vZH5y7sBICJkYz4vwAYHh4GADDJSw5rUqFJA0Amg88k1I1TsgAASnXkwVVIRd0AgNzgmgSflIL/JwDMTBgbIwydo2xunmayM4pHR3GpUZtlpSGl6uXRUYHuWVrvQmbQxEhGZADQxIS5LgAeHRUYhsDCENPIiCEi/s9Dj2oAmPrp98/1bE9DOu52Gh+3AOwaA6MAgRnjAEMoJrIMXP9ifDp9hPLlmfbw6vl08703tgXl+W3Gr6ejhC1l36bikZYnliqVmWQC01HH6TLWRgjkMJGSbpSMNRyUFkPLtipqy/P1UL/x/nz6Z5mJiZDWkYamf/vUwwmXvkRCDSGa2GP9ejd8L+X6VUgYEDMcSbhSrPFSg+YdR4adEd0TdyR8raG1Rag1W21CSyIUibYw2n0zqS29S3OH//KNF5IvnxgbY15l9r8BzPz+6R/GUh2HKNqyPyjP+2GjYmCtJimNhYRQjiGpQNLRlSvv+SbwqevO+8ht3+pStIVEJCFlSzs5yQ7pJNuVUkoCiFngHUl0JxGBma+vQJ65RzN7hrlmmGu8snuauW5WVkMzL7718x/NvvXU16rVWu0qrxdGW7aGm3XvtdFRCGa+bqmLI6OjKj/xiyKHQUkACcGcAJAQQFwCMbGyohLoaNu+E52pVteW5nndkhMSIAEmsTA+DvspZfpRvPSr0aQaHhtjImr4/g9OMHPPqlYEAMaiaXXgswkCC+s7iZaadN2u6tWLRRERwmoNISVDupBOhMhxpHRiwnGcDhKitE6fADMTEXEYU51qampKADDGmEnXdb8ahroU1MtN65VD06i64NAlY10ZSyS01dY2mwoL19rlzh3buFEHhGBmtn6zrkGkWTlNFW+v+E7b2fVYWnuQB5945pKanp62AOAFQTZYmr2G2rwjldOplIrG4lFAxGGNhRNPQKQ6VKFaW9ziuFK5USIGhJREVgttQxWGIWzoWy+f03OXp2cBABMT1++EmZERCwBvPvvM2YFb7yqk2jv6bDTZYGattVUkSAIQQeCLrl23bG1/8scNpVTKr5ZDa7S2gR+aoNnUge9rv250o6paIiqdiMclAGRzuetOTUUAM7MQQvjTf7t9EZX5gcpcvkZS+iykJSGZiAggEAkAkGBTtcws2BKzVQLCZZgUax1xpIQFwQ/0HAAsDA3xjWdBNiuY2cp422SyLfqQlpW4khLMDGYLtgwGAyQAMAgKQggQrShsjEbYDBGyZViCbvqAMCUAyORyfONxvLDAANDUerLuGxAJE2rNvu9zGISsjYHRBkwCloHQb6JZ99irVrlWXeZ6tcLxnfsQ7eiGgCXLaPgelwEAY2MbYCCTsQBQq1dPxSWqMYnWZsNjtoYI9PEzbtZXi4qwqgkIAEkJIgFmhhQC2nKlyNcq61Thpw+jtdrMH5uYTEVof7m8ZMCQbA1ABCK5/qhnBthAG2tbW1tF1WtcuPnAk4Mb8QYft8lsVgIAC/VPATBbZliN2E27EElthTUhiGgN7McHEEFIyZa5QSaAIIAIxZU0pg0DyK46n8Cr/N3okJSUkMppOBzCBA24rgMhhK+UE7qOA7uCghkIZvKz+RdefLny9qlcXgmCtVxc7QFi4wCyKwZj4dqHby9Xa7X87PzsS6++Xn7txeevuAjN0rJXmDwxVXr5lVcKlZpXjLoOuY4ikPBPnTkXTp063XHm4rs1MMMyL6442tzGGRgfH7cMUD6xK28ZZ985/Y6cPJbtPHn2Yt1xIzRXKNSPHsmmjh6bjJeXK3WlVLPq1RcdSYkvfu6WrsyhRxcyBw/0AhYMKqxa2k16wiOjcuTLI3rmr384/8jD9+27eVfftd39/T2e59X2Dg50xaLRius6uCmdbjkyOTV3/vRUW39/3+UH772rf2tXe8rIqAUJgLnw74Z2wwDW0htB8Hpvuuvx2/ft7b+cn71y5PDhmB+Eze8+9s32ZCLaUlxa8j68/IGYW1gUO/t20HKlVn4/X/C0DsPb9w70SOkWN3b9JwAMr74D45sTxeWKUUJSsVQKLl/JdzWD0C8X5/1GRZJXb3iPPHBP6p79dwZbu9p7T569cOnVw8d3LJSWvI7OrsqePbtLADC8MMSbAkDj4ysdcSn3XqLljquCw56+m9o7H/v6oVoiFk0qYeXk1IWFdy+c35JOp+e/cuD+/iAIMLC7b0fVqy/EIg76e7all0u1OQCYwMSm/wXMzz0naWQkPP/8L4+eu3Tl0blCIdyR7tA9+25NBpAe8zlUvLq/qzUuANa1eqNqGXzPXZ/vZmMo1MbXBiUAyOUGN9GIPhEGOHzqzJnI8eOTidy7H1TgJsJIckti/20D27/3+LfEQ/d+obewWJ579fhJ/bs//km8OXVqOh6PgYnU0uJcZWUMjPFmGQAyK9OrPdl55uCBh6ul4h1ub3d6IFwuwJ/PA0I5LlFb4DfhODJZqywh2dbpdPfvboUTz5tG9dmrqaHltda+yY/JRx6KCOBrR/48EFPm/vJy5W42di8IvcKNtQIgBpqu4xTJiZ52Esl/JFviJ4+dvnj8wZEnlzfzN/wXOSmBJFvrXsYAAAAASUVORK5CYII=" style="width:20px;height:20px;object-fit:contain;vertical-align:middle;flex-shrink:0;" alt="下午">'
+var TIME_SLOTS=[
+{label:'☀️',labelText:'上午',from:0,to:780,svgIcon:null},
+{label:'🫖',labelText:'下午',from:780,to:1320,svgIcon:TEAPOT_IMG},
+{label:'🌙',labelText:'夜間',from:1320,to:1440,svgIcon:null}
+];
 wk.forEach(function(day){
 var td=document.createElement('td');
 td.className='wv-cell'+(day.isHol?' holiday-col':'');
 td.dataset.iso=day.iso;td.dataset.tech=tn;
 var onHol=holidayMap[tn]&&holidayMap[tn].indexOf(day.iso)>=0;
-if(onHol){td.classList.add('on-hol');var holTag=document.createElement('div');holTag.style.cssText='font-size:9px;color:var(--orange);text-align:center;padding:4px 0;opacity:.7;';holTag.textContent='🏖️ 休';td.appendChild(holTag);}
+if(onHol){td.classList.add('on-hol');}
+td.style.padding='0';td.style.verticalAlign='top';
 
 // drop zone 事件
 td.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('.wv-cell.wv-drag-over').forEach(function(c){c.classList.remove('wv-drag-over');});this.classList.add('wv-drag-over');});
@@ -1732,7 +1901,6 @@ var newIso=this.dataset.iso;
 var newTech=this.dataset.tech;
 var row=schedule[dsi];
 var oldDs=row.dates[ddi].dateStr;var oldS=row.startMin;var oldE=row.startMin+row.duration;
-// 同步所有同案場分列
 for(var i=0;i<schedule.length;i++){
 var r=schedule[i];if(r.name!==row.name)continue;
 for(var d2=0;d2<r.dates.length;d2++){
@@ -1750,7 +1918,32 @@ var jobs=dayJobs[day.iso].filter(function(j){
 return j.row.technician.split(',').map(function(t){return t.trim();}).indexOf(tn)>=0;
 });
 jobs.sort(function(a,b){return a.row.startMin-b.row.startMin;});
-jobs.forEach(function(j){
+
+// 休假覆蓋整格
+if(onHol){
+var holDiv=document.createElement('div');
+holDiv.style.cssText='font-size:9px;color:var(--orange);text-align:center;padding:6px 0;opacity:.7;';
+holDiv.textContent='🏖️ 休假';td.appendChild(holDiv);
+tr.appendChild(td);return;
+}
+
+// 建立三個時段區塊
+TIME_SLOTS.forEach(function(slot,si){
+var slotJobs=jobs.filter(function(j){return j.row.startMin>=slot.from&&j.row.startMin<slot.to;});
+var hasJobs=slotJobs.length>0;
+var slotDiv=document.createElement('div');
+slotDiv.style.cssText='border-bottom:'+(si<TIME_SLOTS.length-1?'1px solid rgba(0,0,0,0.07)':'none')+';min-height:28px;padding:2px 4px;';
+// 有任務才顯示圖示
+if(hasJobs){
+var lbl=document.createElement('div');
+lbl.style.cssText='line-height:1;margin-bottom:2px;user-select:none;display:flex;align-items:center;gap:2px;';
+var icon=document.createElement('span');
+if(slot.svgIcon){icon.innerHTML=slot.svgIcon;icon.style.cssText='display:inline-flex;align-items:center;flex-shrink:0;';}
+else{icon.style.cssText='font-size:13px;filter:saturate(2) brightness(.85);flex-shrink:0;';icon.textContent=slot.label;}
+lbl.appendChild(icon);slotDiv.appendChild(lbl);
+}
+
+slotJobs.forEach(function(j){
 var jobDiv=document.createElement('div');
 jobDiv.className='wv-job'+(j.isConflict?' is-conflict':'');
 jobDiv.draggable=true;
@@ -1765,7 +1958,6 @@ timeDiv.textContent=minToStr(j.row.startMin)+'–'+minToStr(j.row.startMin+j.row
 jobDiv.appendChild(nameDiv);jobDiv.appendChild(timeDiv);
 if(j.isConflict){var ci=document.createElement('div');ci.style.cssText='font-size:8px;color:var(--red);';ci.textContent='⚠️ 衝堂';jobDiv.appendChild(ci);}
 
-// 拖曳事件
 jobDiv.addEventListener('dragstart',function(e){
 e.dataTransfer.setData('wv-si',String(j.si));
 e.dataTransfer.setData('wv-di',String(j.di));
@@ -1780,14 +1972,19 @@ jobDiv.addEventListener('dragend',function(){
 jobDiv.classList.remove('wv-dragging');
 document.querySelectorAll('.wv-cell.wv-drag-over').forEach(function(c){c.classList.remove('wv-drag-over');});
 });
-
-// 點擊→跳到 DayView 該天
 var isDragging=false;
 jobDiv.addEventListener('mousedown',function(){isDragging=false;});
 jobDiv.addEventListener('mousemove',function(){isDragging=true;});
-jobDiv.addEventListener('click',function(){if(!isDragging){dvDate=new Date(day.iso+'T00:00:00');switchTab('dayview');}});
-
-td.appendChild(jobDiv);
+jobDiv.addEventListener('click',function(e){
+if(isDragging)return;
+// 先把 dvDate 設到該天，讓 move popup 的日期計算正確
+dvDate=new Date(day.iso+'T00:00:00');
+if(j.row.fixed)onDvFixedJobClick(e,j.si,j.di);
+else onDvJobClick(e,j.si,j.di);
+});
+slotDiv.appendChild(jobDiv);
+});
+td.appendChild(slotDiv);
 });
 tr.appendChild(td);
 });
@@ -1899,5 +2096,166 @@ fbListen(month);
 }
 </script>
 
+
+<script>
+var CLIENT_DB = [{"name": "山崎_SAISON DU SOLEIL_統一時代店", "area": "台北市信義區", "district": "台北市信義區", "count": 3, "work_order": "SD003", "time": "22:30", "duration": 30, "technician": "Ray", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}, {"date": "2026-05-26", "task": "第三次例行", "week_num": 4, "weekday": 1}]}, {"name": "山崎_Yamazaki_統一夢廣場店", "area": "台北市松山區", "district": "台北市松山區", "count": 3, "work_order": "SD003", "time": "23:00", "duration": 45, "technician": "Ray", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}, {"date": "2026-05-26", "task": "第三次例行", "week_num": 4, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_統一時代市府店", "area": "台北市信義區", "district": "台北市信義區", "count": 3, "work_order": "SD003", "time": "22:00", "duration": 30, "technician": "Ray", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}, {"date": "2026-05-26", "task": "第三次例行", "week_num": 4, "weekday": 1}]}, {"name": "Subway_板橋新埔店", "area": "新北市板橋區", "district": "新北市板橋區", "count": 1, "work_order": "SD003", "time": "10:15", "duration": 30, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}]}, {"name": "一之軒新店", "area": "新北市新店區", "district": "新北市新店區", "count": 1, "work_order": "F20240213101932", "time": "13:00", "duration": 60, "technician": "Ivan, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-22", "task": "第一次例行", "week_num": 4, "weekday": 4}]}, {"name": "人文藝術幼稚園", "area": "台中市西屯區", "district": "台中市西屯區", "count": 1, "work_order": "F20240213101932", "time": "07:00", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}]}, {"name": "大裕生技製藥", "area": "台中梧棲區", "district": "台中梧棲區", "count": 1, "work_order": "", "time": "14:00", "duration": 30, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}]}, {"name": "元富證券_新店分公司", "area": "新北市新店區", "district": "新北市新店區", "count": 1, "work_order": "F20240213101932", "time": "16:00", "duration": 45, "technician": "Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-22", "task": "第一次例行", "week_num": 4, "weekday": 4}]}, {"name": "升提實業", "area": "台北市中山區", "district": "台北市中山區", "count": 1, "work_order": "F20240213101932", "time": "15:15", "duration": 40, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}]}, {"name": "台塑楊梅有機生態農場", "area": "桃園市楊梅區", "district": "桃園市楊梅區", "count": 1, "work_order": "F20240213101932", "time": "13:30", "duration": 60, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}]}, {"name": "冠榮", "area": "台北市中山區", "district": "台北市中山區", "count": 1, "work_order": "", "time": "", "duration": 30, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "", "week_num": 1, "weekday": 2}]}, {"name": "高野農業生技股份有限公司", "area": "雲林縣斗六市", "district": "雲林縣斗六市", "count": 1, "work_order": "F20240213101932", "time": "16:00", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-18", "task": "第一次例行", "week_num": 3, "weekday": 0}]}, {"name": "芳泉工業股份有限公司", "area": "台北市中山區", "district": "台北市中山區", "count": 1, "work_order": "F20240213101932", "time": "16:00", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}]}, {"name": "德朗飲食企業股份有限公司 - 辦公室", "area": "台北市內湖區", "district": "台北市內湖區", "count": 1, "work_order": "", "time": "11:00", "duration": 15, "technician": "HB, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}]}, {"name": "龍巖_汐止總公司_員工餐廳", "area": "新北市汐止區", "district": "新北市汐止區", "count": 1, "work_order": "SD003", "time": "15:00", "duration": 45, "technician": "HB, Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-20", "task": "第一次例行", "week_num": 3, "weekday": 2}]}, {"name": "BDoffice", "area": "臺北市信義區", "district": "臺北市信義區", "count": 2, "work_order": "F20240213101932", "time": "11:00", "duration": 30, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "MR豚骨拉麵", "area": "嘉義市西區", "district": "嘉義市西區", "count": 2, "work_order": "SD003", "time": "13:30", "duration": 30, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}]}, {"name": "ABC Cooking Studio_台北101旗艦教室", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "ABC Cooking Studio_南港教室", "area": "台北市南港區", "district": "台北市南港區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-15", "task": "第一次例行", "week_num": 3, "weekday": 4}, {"date": "2026-05-29", "task": "第二次例行", "week_num": 5, "weekday": 4}]}, {"name": "Jiji居酒屋", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "15:00", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "RELAX33", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 45, "technician": "Ray, HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "The One", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "10:30", "duration": 45, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "一風堂_中山本店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "F20250710134451", "time": "10:00", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "一風堂_桃園高鐵店", "area": "桃園縣中壢市", "district": "桃園縣中壢市", "count": 2, "work_order": "F20250710134451", "time": "08:45", "duration": 30, "technician": "Jane", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "一蘭_台中店(朝富）", "area": "台中市西屯區", "district": "台中市西屯區", "count": 2, "work_order": "SD003", "time": "08:00", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "一蘭_台北本店", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 30, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "一蘭_台北本店別館", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "08:00", "duration": 30, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "一蘭_商品管理部", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "08:00", "duration": 30, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "山崎_FLAVOR FIELD_天母店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "16:30", "duration": 45, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "山崎_FLAVOR FIELD_台中大遠百店", "area": "台中市西屯區", "district": "台中市西屯區", "count": 2, "work_order": "SD003", "time": "16:15", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "山崎_FLAVOR FIELD_忠孝復興店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "16:30", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "山崎_FLAVOR FIELD_漢神巨蛋店", "area": "高雄市左營區", "district": "高雄市左營區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "山崎_FLAVOR FIELD_漢神百貨店", "area": "高雄市前金區", "district": "高雄市前金區", "count": 2, "work_order": "SD003", "time": "16:00", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "山崎_FLAVOR FIELD_遠東竹北店", "area": "新竹縣竹北市", "district": "新竹縣竹北市", "count": 2, "work_order": "SD003", "time": "15:00", "duration": 30, "technician": "Ray, HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "山崎_FUJIYA_漢神巨蛋店", "area": "高雄市左營區", "district": "高雄市左營區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "山崎_SAISON DU SOLEIL_大立店", "area": "高雄市前金區", "district": "高雄市前金區", "count": 2, "work_order": "SD003", "time": "16:30", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第二次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第一次例行", "week_num": 4, "weekday": 4}]}, {"name": "山崎_SAISON DU SOLEIL_中友店", "area": "台中市北區", "district": "台中市北區", "count": 2, "work_order": "SD003", "time": "16:00", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "山崎_SAISON DU SOLEIL_板橋遠百店", "area": "新北市板橋區", "district": "新北市板橋區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "山崎_SAISON DU SOLEIL_新竹巨城店", "area": "新竹市東區", "district": "新竹市東區", "count": 2, "work_order": "SD003", "time": "10:15", "duration": 45, "technician": "Daniel, Hubert", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "山崎_SAISON DU SOLEIL_義享店", "area": "高雄巿鼓山區", "district": "高雄巿鼓山區", "count": 2, "work_order": "SD003", "time": "15:00", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "山崎_THE PREMIUM YAMAZAKI_中壢店", "area": "桃園市中壢區", "district": "桃園市中壢區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 30, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "山崎_THE PREMIUM YAMAZAKI_崇光店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "16:30", "duration": 30, "technician": "Ivan, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "山崎_Yamazaki_三多店", "area": "高雄市前鎮區", "district": "高雄市前鎮區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 30, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "山崎_Yamazaki_大樂店", "area": "高雄市三民區", "district": "高雄市三民區", "count": 2, "work_order": "SD003", "time": "16:15", "duration": 30, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "山崎_Yamazaki_中山醫大店", "area": "台中市南區", "district": "台中市南區", "count": 2, "work_order": "SD003", "time": "15:00", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "山崎_Yamazaki_台中五權店", "area": "臺中市北區", "district": "臺中市北區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "赫士盟餐飲集團_凪 豚王拉麵_台中店", "area": "台中市西屯區", "district": "台中市西屯區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 60, "technician": "Daniel", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "山崎_Yamazaki_台中北屯店", "area": "台中市北屯區", "district": "台中市北屯區", "count": 2, "work_order": "SD003", "time": "16:15", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "山崎_Yamazaki_台中學士店", "area": "臺中市北區", "district": "臺中市北區", "count": 2, "work_order": "SD003", "time": "16:15", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "山崎_Yamazaki_台北中山店", "area": "台北市大同區", "district": "台北市大同區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Ivan, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "山崎_Yamazaki_台茂店", "area": "桃園縣蘆竹鄉", "district": "桃園縣蘆竹鄉", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 30, "technician": "Ivan", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "山崎_Yamazaki_汐科店", "area": "新北市汐止區", "district": "新北市汐止區", "count": 2, "work_order": "SD003", "time": "16:00", "duration": 30, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "山崎_Yamazaki_東森北車店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "16:30", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "山崎_Yamazaki_屏東太平洋百貨店", "area": "屏東縣屏東市", "district": "屏東縣屏東市", "count": 2, "work_order": "SD003", "time": "21:45", "duration": 30, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "山崎_Yamazaki_烏日店", "area": "臺中市烏日區", "district": "臺中市烏日區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "山崎_Yamazaki_站前店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "16:30", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "山崎_Yamazaki_新莊佳瑪店", "area": "新北市新莊區", "district": "新北市新莊區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "山崎台中洲際FF", "area": "台中市北屯區", "district": "台中市北屯區", "count": 2, "work_order": "", "time": "16:00", "duration": 45, "technician": "Daniel, Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "山崎台中洲際TC", "area": "台中市北屯區", "district": "台中市北屯區", "count": 2, "work_order": "", "time": "15:00", "duration": 45, "technician": "Daniel, Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "丰居旅店_忠孝館", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "F20240213101932", "time": "14:00", "duration": 60, "technician": "Ray", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "丰居旅店_雙連館", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 60, "technician": "Ray", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "北丸_KITAMARU_台中lalaport店", "area": "台中市東區", "district": "台中市東區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 30, "technician": "Daniel", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "台北旅店集團_丹迪旅店_大安森林公園店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 90, "technician": "Ray, Jane", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "台北旅店集團_丹迪旅店_丹迪天母店", "area": "台北市士林區", "district": "台北市士林區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 90, "technician": "HB, Jane", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "台北旅店集團_新驛旅店_台中車站店", "area": "台中市東區", "district": "台中市東區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 90, "technician": "Daniel", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "台北旅店集團_新驛旅店_台北車站一館", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 90, "technician": "Ivan", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "台北旅店集團_新驛旅店_台北車站二館", "area": "台北市大同區", "district": "台北市大同區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 45, "technician": "Ray, Jane", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "台北旅店集團_新驛旅店_台北車站三館", "area": "台北市大同區", "district": "台北市大同區", "count": 2, "work_order": "F20240213101932", "time": "13:45", "duration": 45, "technician": "Ray, Jane", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "台北旅店集團_新驛旅店_西門捷運店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 60, "technician": "Ray", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-12", "task": "第二次例行", "week_num": 2, "weekday": 1}]}, {"name": "台北旅店集團_新驛旅店_復興北路店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 90, "technician": "HB", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "合點壽司_內湖店", "area": "台北市內湖區", "district": "台北市內湖區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "合點壽司_台中大遠百", "area": "台中市西屯區", "district": "台中市西屯區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 60, "technician": "Daniel", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "合點壽司_竹北遠百店", "area": "新竹縣竹北市", "district": "新竹縣竹北市", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 45, "technician": "HB, Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "合點壽司_京站店", "area": "台北市大同區", "district": "台北市大同區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Ray, HB", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "合點壽司_南港Lalaport店", "area": "台北市南港區", "district": "台北市南港區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "合點壽司_華泰店", "area": "桃園市中壢區", "district": "桃園市中壢區", "count": 2, "work_order": "SD003", "time": "10:00", "duration": 45, "technician": "Jane", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "地中海餐酒館", "area": "台中市西區", "district": "台中市西區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "好炸小廚房", "area": "台北市士林區", "district": "台北市士林區", "count": 2, "work_order": "SD003", "time": "16:00", "duration": 30, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "好食餐飲集團_客美多咖啡廳_天母店", "area": "台北市士林區", "district": "台北市士林區", "count": 2, "work_order": "SD003", "time": "15:00", "duration": 45, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "好食餐飲集團_客美多咖啡廳_忠孝光復加盟店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "15:45", "duration": 30, "technician": "Ivan, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "好食餐飲集團_客美多咖啡廳_桃園藝文店", "area": "桃園縣桃園市", "district": "桃園縣桃園市", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "好食餐飲集團_客美多咖啡廳_敦南信義加盟店(大安店)", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "15:00", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "好食餐飲集團_客美多咖啡廳_臺中崇德加盟店", "area": "台中市北屯區", "district": "台中市北屯區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "佐曼咖啡", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "希臘左巴_古亭店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "15:00", "duration": 45, "technician": "Ray, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "希臘左巴台大店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "16:00", "duration": 45, "technician": "Ray, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "尊鴻餐飲_HUN 貳_台中逢甲店", "area": "台中市西屯區", "district": "台中市西屯區", "count": 2, "work_order": "SD003", "time": "10:30", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "京浦私廚", "area": "台中市西區", "district": "台中市西區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "夜上海", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 60, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "尚冠冷凍食品（一廠）", "area": "新北市瑞芳區", "district": "新北市瑞芳區", "count": 2, "work_order": "F20240213101932", "time": "14:45", "duration": 60, "technician": "Jane, Ivan", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "尚冠冷凍食品 （二廠）", "area": "新北市瑞芳區", "district": "新北市瑞芳區", "count": 2, "work_order": "F20240213101932", "time": "14:45", "duration": 60, "technician": "Jane, Ivan", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}]}, {"name": "尚冠冷凍食品 （二廠)", "area": "新北市瑞芳區", "district": "新北市瑞芳區", "count": 2, "work_order": "F20240213101932", "time": "16:30", "duration": 60, "technician": "Jane, Ivan", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "臥龍崗包子", "area": "台北市士林區", "district": "台北市士林區", "count": 2, "work_order": "SD003", "time": "16:30", "duration": 30, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "金澤壽司", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "客美多 淡水捷運站", "area": "新北市淡水區", "district": "新北市淡水區", "count": 2, "work_order": "SD003", "time": "10:15", "duration": 45, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "客美多_民生圓環直營店", "area": "台北市松山區", "district": "台北市松山區", "count": 2, "work_order": "SD003", "time": "15:45", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "客美多-小巨蛋店", "area": "台北市松山區", "district": "台北市松山區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "客美多-公館", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "08:15", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "客美多咖啡_台北轉運站店", "area": "台北市大同區", "district": "台北市大同區", "count": 2, "work_order": "SD003", "time": "14:00", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "客美多咖啡廳_誠品站前店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "Ray, HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "宣原蛋糕", "area": "台北市士林區", "district": "台北市士林區", "count": 2, "work_order": "SD003", "time": "16:00", "duration": 30, "technician": "", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "洋石", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "10:30", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第一次例行", "week_num": 4, "weekday": 1}]}, {"name": "洪瑞珍台中", "area": "台中市西區", "district": "台中市西區", "count": 2, "work_order": "SD003", "time": "07:00", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "徠卡", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "F20240213101932", "time": "10:45", "duration": 30, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "惦記粉漿蛋餅_台中十甲東店", "area": "台中市東區", "district": "台中市東區", "count": 2, "work_order": "SD003", "time": "13:00", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "惦記粉漿蛋餅_台中英才晨光店", "area": "台中市北區", "district": "台中市北區", "count": 2, "work_order": "SD003", "time": "13:00", "duration": 30, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "凱恩斯岩燒牛排_台中公益店", "area": "台中市南屯區", "district": "台中市南屯區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}, {"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}]}, {"name": "尊鴻餐飲_HUN 混_台中一中店", "area": "台中市北區", "district": "台中市北區", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "尊鴻餐飲_JAI 宅_台中水湳店", "area": "台中市北屯區", "district": "台中市北屯區", "count": 2, "work_order": "SD003", "time": "", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "尊鴻餐飲_JAI 宅_新竹巨城店", "area": "新竹市東區", "district": "新竹市東區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Daniel, Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-01", "task": "第一次例行", "week_num": 1, "weekday": 4}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "尊鴻餐飲_SUNG 嵩_台中美村店", "area": "台中市西區", "district": "台中市西區", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "嵐十三大里", "area": "台中市大里區", "district": "台中市大里區", "count": 2, "work_order": "SD003", "time": "13:00", "duration": 30, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "嵐十三大鵬", "area": "台中市西屯區", "district": "台中市西屯區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 30, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "雅峰小客車", "area": "臺北市松山區", "district": "臺北市松山區", "count": 2, "work_order": "F20240213101932", "time": "13:30", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "雲雀國際_LA OHANA_LaLaport南港店", "area": "台北市南港區", "district": "台北市南港區", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "雲雀國際_古拉爵_台中港三井店", "area": "台中市梧棲區", "district": "台中市梧棲區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Daniel", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "雲雀國際_古拉爵_屏東太平洋店", "area": "屏東縣屏東市", "district": "屏東縣屏東市", "count": 2, "work_order": "SD003", "time": "22:15", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "雲雀國際_武蔵野森珈琲_高雄台鋁店", "area": "高雄市前鎮區", "district": "高雄市前鎮區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "雲雀國際_武蔵野森珈琲Diner(lalaport)", "area": "台中市東區", "district": "台中市東區", "count": 2, "work_order": "SD003", "time": "07:00", "duration": 30, "technician": "Daniel", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "雲雀國際_涮乃葉_涮之華LaLaport台中店", "area": "台中市東區", "district": "台中市東區", "count": 2, "work_order": "SD003", "time": "07:30", "duration": 30, "technician": "Daniel", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}, {"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}]}, {"name": "雲雀國際_橫濱牛排_LaLaport台中店", "area": "台中市東區", "district": "台中市東區", "count": 2, "work_order": "SD003", "time": "08:00", "duration": 30, "technician": "Daniel", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "雲雀國際_武蔵野森珈琲Diner__巨蛋SOGO店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 60, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "雲雀國際_武蔵野森珈琲Diner__西門相鐵店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 30, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "雲雀國際_武蔵野森珈琲Diner_LaLaport南港店", "area": "台北市南港區", "district": "台北市南港區", "count": 2, "work_order": "SD003", "time": "09:15", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "雲雀國際_武蔵野森珈琲Diner_新莊思源店", "area": "新北市新莊區", "district": "新北市新莊區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 30, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉__中壢中山東路店", "area": "桃園市中壢區", "district": "桃園市中壢區", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "雲雀國際_涮乃葉_土城日月光廣場店", "area": "新北市土城區", "district": "新北市土城區", "count": 2, "work_order": "SD003", "time": "23:00", "duration": 60, "technician": "HB", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "雲雀國際_涮乃葉_中和台科廣場店", "area": "新北市中和區", "district": "新北市中和區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_台南三井店", "area": "台南市歸仁區", "district": "台南市歸仁區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 30, "technician": "Ivan, Chips", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_台南大潤發店", "area": "台南市北區", "district": "台南市北區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_台南大潤發店 2", "area": "台南市北區", "district": "台南市北區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_竹北遠百店", "area": "新竹縣竹北市", "district": "新竹縣竹北市", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 45, "technician": "HB, Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "雲雀國際_涮乃葉_忠孝明曜店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_信義遠百店", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 60, "technician": "HB", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "雲雀國際_涮乃葉_屏東太平洋店", "area": "屏東縣屏東市", "district": "屏東縣屏東市", "count": 2, "work_order": "SD003", "time": "23:00", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "雲雀國際_涮乃葉_徐匯廣場店", "area": "新北市蘆洲區", "district": "新北市蘆洲區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "Ivan", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "雲雀國際_涮乃葉_高雄SKM Park店", "area": "高雄市前鎮區", "district": "高雄市前鎮區", "count": 2, "work_order": "SD003", "time": "23:00", "duration": 60, "technician": "Ivan", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_高雄五福一路店", "area": "高雄市苓雅區", "district": "高雄市苓雅區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 45, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "雲雀國際_涮乃葉_高雄義享店", "area": "高雄市鼓山區", "district": "高雄市鼓山區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "雲雀國際_涮乃葉_基隆好食城店", "area": "基隆市中正區", "district": "基隆市中正區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 75, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-19", "task": "第一次例行", "week_num": 3, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "雲雀國際_涮乃葉_新店小碧潭店", "area": "新北市新店區", "district": "新北市新店區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Ivan, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "雲雀國際_涮乃葉_新莊思源店", "area": "新北市新莊區", "district": "新北市新莊區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "雲雀國際_橫濱牛排_中壢中山東路店", "area": "桃園市中壢區", "district": "桃園市中壢區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "雲雀國際_橫濱牛排_台中三井店", "area": "台中市梧棲區", "district": "台中市梧棲區", "count": 2, "work_order": "SD003", "time": "10:15", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "雲雀國際_橫濱牛排_台南三井店", "area": "台南市歸仁區", "district": "台南市歸仁區", "count": 2, "work_order": "SD003", "time": "08:00", "duration": 45, "technician": "Ivan, Chips", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "雲雀國際_橫濱牛排_岡山樂購廣場店", "area": "高雄市岡山區", "district": "高雄市岡山區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "Chips", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-29", "task": "第二次例行", "week_num": 5, "weekday": 4}]}, {"name": "雲雀國際_橫濱牛排_林口三井店", "area": "新北市林口區", "district": "新北市林口區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Ivan", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "雲雀國際_橫濱牛排_高雄SKM Park店", "area": "高雄市前鎮區", "district": "高雄市前鎮區", "count": 2, "work_order": "SD003", "time": "22:00", "duration": 60, "technician": "Ivan, Chips", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "雲雀國際_橫濱牛排_新竹大魯閣店", "area": "新竹市北區", "district": "新竹市北區", "count": 1, "work_order": "F20240213101932", "time": "11:00", "duration": 20, "technician": "Daniel", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}]}, {"name": "雲雀國際_藍屋_新竹竹北遠百店", "area": "新竹縣竹北市", "district": "新竹縣竹北市", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "HB, Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "壽司郎_土城日月光店", "area": "新北市土城區", "district": "新北市土城區", "count": 2, "work_order": "SD003", "time": "22:00", "duration": 60, "technician": "HB", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "壽司郎_天母高島屋店", "area": "台北市士林區", "district": "台北市士林區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 60, "technician": "Errko, Jane", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "壽司郎_台中漢口路店", "area": "新竹市北區", "district": "新竹市北區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 60, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "壽司郎_台中福科路店", "area": "台中市西屯區", "district": "台中市西屯區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "壽司郎_台中黎明市政南店", "area": "台中市南屯區", "district": "台中市南屯區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 60, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "壽司郎_台北中華路店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "09:15", "duration": 60, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "壽司郎_台北內湖美麗華店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "22:30", "duration": 60, "technician": "Tom", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "壽司郎_台北公館店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "壽司郎_台北民權建國店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "壽司郎_台北永春店", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "09:15", "duration": 60, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "壽司郎_台北松江店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "壽司郎_台北林森店", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "壽司郎_台北南港CityLink店", "area": "台北市南港區", "district": "台北市南港區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 45, "technician": "Ray", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-15", "task": "第一次例行", "week_num": 3, "weekday": 4}, {"date": "2026-05-29", "task": "第二次例行", "week_num": 5, "weekday": 4}]}, {"name": "壽司郎_台北館前路店", "area": "台北市中正區", "district": "台北市中正區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "壽司郎_台南永康店", "area": "台南市永康區", "district": "台南市永康區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "壽司郎_台南安平店", "area": "台南市安平區", "district": "台南市安平區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "壽司郎_台南西門路店 1", "area": "台南市北區", "district": "台南市北區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}]}, {"name": "壽司郎_台南西門路店 2", "area": "台南市北區", "district": "台南市北區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "壽司郎_台南南紡店", "area": "台南市東區", "district": "台南市東區", "count": 2, "work_order": "SD003", "time": "22:00", "duration": 60, "technician": "Ivan, Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "壽司郎_石牌店", "area": "台北市北投區", "district": "台北市北投區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "George", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "壽司郎_汐止遠雄店", "area": "新北市汐止區", "district": "新北市汐止區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "HB", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-01", "task": "第一次例行", "week_num": 1, "weekday": 4}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "壽司郎_宜蘭站前店", "area": "宜蘭縣宜蘭市", "district": "宜蘭縣宜蘭市", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 75, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "壽司郎_板橋府中店", "area": "新北市板橋區", "district": "新北市板橋區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 60, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "壽司郎_板橋新埔店", "area": "新北市板橋區", "district": "新北市板橋區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "壽司郎_青埔店", "area": "桃園縣桃園市", "district": "桃園縣桃園市", "count": 2, "work_order": "SD003", "time": "09:15", "duration": 45, "technician": "Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "壽司郎_徐匯廣場店", "area": "新北市蘆洲區", "district": "新北市蘆洲區", "count": 2, "work_order": "SD003", "time": "09:15", "duration": 60, "technician": "Ivan", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-01", "task": "第一次例行", "week_num": 1, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "壽司郎_桃園國際路店", "area": "桃園縣桃園市", "district": "桃園縣桃園市", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "壽司郎_高雄中正店", "area": "高雄市新興區", "district": "高雄市新興區", "count": 2, "work_order": "SD003", "time": "09:15", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "壽司郎_高雄岡山秀泰店", "area": "高雄市岡山區", "district": "高雄市岡山區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 60, "technician": "Chips", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "壽司郎_高雄義享天地店", "area": "高雄市鼓山區", "district": "高雄市鼓山區", "count": 2, "work_order": "SD003", "time": "09:15", "duration": 60, "technician": "Chips", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "壽司郎_高雄鳳山店", "area": "高雄市鳳山區", "district": "高雄市鳳山區", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 60, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "壽司郎_淡水店", "area": "新北市淡水區", "district": "新北市淡水區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 75, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "壽司郎_新北中和環球店", "area": "新北市中和區", "district": "新北市中和區", "count": 2, "work_order": "SD003", "time": "22:00", "duration": 60, "technician": "George, Ivan", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-05", "task": "第一次例行", "week_num": 1, "weekday": 1}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "壽司郎_新竹巨城店", "area": "新竹市東區", "district": "新竹市東區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 60, "technician": "Daniel, Hubert", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-01", "task": "第一次例行", "week_num": 1, "weekday": 4}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "壽司郎_新竹慈雲路店", "area": "新竹市東區", "district": "新竹市東區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "壽司郎_新莊中平店", "area": "新北市新莊區", "district": "新北市新莊區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "壽司郎_彰化金馬店", "area": "彰化縣彰化市", "district": "彰化縣彰化市", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 60, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "壽司郎_彰化員林大道店", "area": "彰化縣員林鎮", "district": "彰化縣員林鎮", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "蜜柑壽喜燒", "area": "台中市西區", "district": "台中市西區", "count": 2, "work_order": "", "time": "16:00", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "赫士盟餐飲集團_chili's_台北天母店", "area": "台北市士林區", "district": "台北市士林區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 30, "technician": "Errko, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-08", "task": "第一次例行", "week_num": 2, "weekday": 4}, {"date": "2026-05-22", "task": "第二次例行", "week_num": 4, "weekday": 4}]}, {"name": "赫士盟餐飲集團_中央廚房", "area": "新北市汐止區", "district": "新北市汐止區", "count": 2, "work_order": "SD003", "time": "13:00", "duration": 50, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "赫士盟餐飲集團_凪 豚王拉麵_忠孝店", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "09:00", "duration": 30, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}, {"name": "赫士盟餐飲集團_凪 豚王拉麵_赫士盟大樓", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "15:30", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-01", "task": "第一次例行", "week_num": 1, "weekday": 4}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "赫士盟餐飲集團_茹絲葵經典牛排館_台中店", "area": "台中市西區", "district": "台中市西區", "count": 2, "work_order": "SD003", "time": "10:15", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "赫士盟餐飲集團_茹絲葵經典牛排館_民生店", "area": "台北市松山區", "district": "台北市松山區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 45, "technician": "HB, Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "赫士盟餐飲集團_茹絲葵經典牛排館_高雄店", "area": "高雄市前金區", "district": "高雄市前金區", "count": 2, "work_order": "SD003", "time": "14:15", "duration": 45, "technician": "Chips", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "劍持屋A4", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "劍持屋SOGO", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "德朗_行善店", "area": "台北市內湖區", "district": "台北市內湖區", "count": 2, "work_order": "SD003", "time": "10:00", "duration": 45, "technician": "HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "德朗_信義店", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "10:00", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-21", "task": "第二次例行", "week_num": 3, "weekday": 3}]}, {"name": "德朗_開朗小火鍋", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "10:00", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-28", "task": "第二次例行", "week_num": 4, "weekday": 3}]}, {"name": "德朗_瑞光店", "area": "台北市內湖區", "district": "台北市內湖區", "count": 2, "work_order": "SD003", "time": "10:00", "duration": 45, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "樂天餐飲集團_樂天小香港", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Errko, Jane", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "樂天餐飲集團_樂天皇朝_信義店", "area": "台北市信義區", "district": "台北市信義區", "count": 2, "work_order": "SD003", "time": "10:00", "duration": 45, "technician": "HB", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "樂天餐飲集團_樂天皇朝_宏匯廣場店", "area": "新北市新莊區", "district": "新北市新莊區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 45, "technician": "Ivan", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "樂天餐飲集團_樂蝦拉麵家_宏匯廣場店", "area": "新北市新莊區", "district": "新北市新莊區", "count": 2, "work_order": "SD003", "time": "09:30", "duration": 45, "technician": "Ivan", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "樂天餐飲集團_樂天皇朝_裕隆城誠品生活新店店", "area": "新北市新店區", "district": "新北市新店區", "count": 2, "work_order": "SD003", "time": "08:45", "duration": 45, "technician": "Jane, Ivan", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "樂軒和牛專門店_台中店", "area": "台中市南區", "district": "台中市南區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 45, "technician": "Hubert", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-04", "task": "第一次例行", "week_num": 1, "weekday": 0}, {"date": "2026-05-18", "task": "第二次例行", "week_num": 3, "weekday": 0}]}, {"name": "樂軒餐飲集團_樂軒和牛專門店_新竹店", "area": "新竹縣竹北市", "district": "新竹縣竹北市", "count": 2, "work_order": "SD003", "time": "13:30", "duration": 45, "technician": "Ray, HB", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-01", "task": "第一次例行", "week_num": 1, "weekday": 4}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "蔣記家薌麵", "area": "台北市大安區", "district": "台北市大安區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 45, "technician": "Ivan, Jane", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "燒肉滋滋", "area": "台中市南屯區", "district": "台中市南屯區", "count": 2, "work_order": "SD003", "time": "14:00", "duration": 45, "technician": "Daniel", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-13", "task": "第一次例行", "week_num": 2, "weekday": 2}, {"date": "2026-05-27", "task": "第二次例行", "week_num": 4, "weekday": 2}]}, {"name": "謝謝台味 炭烤", "area": "台北市內湖區", "district": "台北市內湖區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 30, "technician": "Ivan", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "點水樓(大直)", "area": "台北市中山區", "district": "台北市中山區", "count": 2, "work_order": "SD003", "time": "14:30", "duration": 60, "technician": "Ray", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-01", "task": "第一次例行", "week_num": 1, "weekday": 4}, {"date": "2026-05-15", "task": "第二次例行", "week_num": 3, "weekday": 4}]}, {"name": "馥良西門雲町旅店", "area": "台北市萬華區", "district": "台北市萬華區", "count": 2, "work_order": "F20240213101932", "time": "13:00", "duration": 75, "technician": "Ray, Jane", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-11", "task": "第一次例行", "week_num": 2, "weekday": 0}, {"date": "2026-05-25", "task": "第二次例行", "week_num": 4, "weekday": 0}]}, {"name": "鶴橋風月_林口本店", "area": "新北市林口區", "district": "新北市林口區", "count": 2, "work_order": "SD003", "time": "08:30", "duration": 60, "technician": "Ivan", "fixed": true, "need_permit": false, "date_entries": [{"date": "2026-05-14", "task": "第一次例行", "week_num": 2, "weekday": 3}, {"date": "2026-05-29", "task": "第二次例行", "week_num": 5, "weekday": 4}]}, {"name": "鶴橋風月大阪燒_lalaport 南港", "area": "台北市南港區", "district": "台北市南港區", "count": 2, "work_order": "SD003", "time": "10:15", "duration": 30, "technician": "Ray", "fixed": false, "need_permit": true, "date_entries": [{"date": "2026-05-06", "task": "第一次例行", "week_num": 1, "weekday": 2}, {"date": "2026-05-20", "task": "第二次例行", "week_num": 3, "weekday": 2}]}, {"name": "鶴橋風月大阪燒_台南三井店", "area": "台南市歸仁區", "district": "台南市歸仁區", "count": 2, "work_order": "SD003", "time": "09:45", "duration": 45, "technician": "Ivan, Chips", "fixed": true, "need_permit": true, "date_entries": [{"date": "2026-05-07", "task": "第一次例行", "week_num": 1, "weekday": 3}, {"date": "2026-05-19", "task": "第二次例行", "week_num": 3, "weekday": 1}]}, {"name": "鰻有財", "area": "新北市新莊區", "district": "新北市新莊區", "count": 2, "work_order": "SD003", "time": "11:00", "duration": 45, "technician": "", "fixed": false, "need_permit": false, "date_entries": [{"date": "2026-05-12", "task": "第一次例行", "week_num": 2, "weekday": 1}, {"date": "2026-05-26", "task": "第二次例行", "week_num": 4, "weekday": 1}]}];
+
+function timeToMin2(t){if(!t)return 540;var p=t.split(':');return parseInt(p[0])*60+(parseInt(p[1])||0);}
+function toISO2(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+function getNthWeekdayOfMonth(year,month,weekNum,weekday){
+  var count=0;var days=new Date(year,month,0).getDate();
+  for(var d=1;d<=days;d++){
+    var dt=new Date(year,month-1,d);
+    var wd=dt.getDay()===0?6:dt.getDay()-1;
+    if(wd===weekday){count++;if(count===weekNum)return dt;}
+  }
+  return null;
+}
+
+function buildScheduleForMonth(year,month){
+  var ns=[];
+  CLIENT_DB.forEach(function(c,idx){
+    var taskDates=[];var seen={};
+    c.date_entries.forEach(function(e){
+      var d=getNthWeekdayOfMonth(year,month,e.week_num,e.weekday);
+      if(d){
+        var iso=toISO2(d);
+        if(!seen[iso]){seen[iso]=true;taskDates.push({dateStr:iso,task:e.task});}
+      }
+    });
+    taskDates.sort(function(a,b){return a.dateStr.localeCompare(b.dateStr);});
+    if(!taskDates.length)return;
+    var area=c.area||'';
+    var region=(area.indexOf('台中')>=0||area.indexOf('台南')>=0||area.indexOf('高雄')>=0||area.indexOf('屏東')>=0||area.indexOf('彰化')>=0||area.indexOf('嘉義')>=0)?'中南':'北';
+    var sm=timeToMin2(c.time);
+    ns.push({id:idx,name:c.name,area:area,district:c.district||'',region:region,
+      group:'',fixed:c.fixed||false,technician:c.technician||'',work_order:c.work_order||'',
+      start_time:c.time||'09:00',startMin:sm,duration:c.duration||30,
+      need_permit:c.need_permit||false,is_restaurant:true,modified:false,
+      dates:taskDates,color:getTechColor(c.technician||'')});
+  });
+  return ns;
+}
+
+function openMonthPicker(){
+  var existing=document.getElementById('month-picker-popup');
+  if(existing){existing.remove();return;}
+  var popup=document.createElement('div');popup.id='month-picker-popup';
+  popup.style.cssText='position:fixed;top:60px;left:160px;z-index:1001;background:#fff;border:1px solid var(--accent);border-radius:10px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.15);min-width:260px;';
+  var title=document.createElement('div');title.style.cssText='font-size:13px;font-weight:500;margin-bottom:12px;';title.textContent='🗓 選擇排班月份';popup.appendChild(title);
+  var btnWrap=document.createElement('div');btnWrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;';
+  var today=new Date();
+  for(var i=0;i<6;i++){
+    var d=new Date(today.getFullYear(),today.getMonth()+i,1);
+    var ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    var btn=document.createElement('button');btn.className='btn btn-ghost';btn.dataset.ym=ym;btn.style.cssText='font-size:12px;padding:5px 12px;';
+    btn.textContent=(d.getMonth()+1)+'月 '+d.getFullYear();
+    btn.onclick=function(){this.classList.toggle('btn-primary');this.classList.toggle('btn-ghost');};
+    btnWrap.appendChild(btn);
+  }
+  popup.appendChild(btnWrap);
+  var actWrap=document.createElement('div');actWrap.style.cssText='display:flex;gap:8px;';
+  var okBtn=document.createElement('button');okBtn.className='btn btn-primary';okBtn.style.cssText='flex:1;justify-content:center;';okBtn.textContent='✓ 產生';okBtn.onclick=confirmGenerate;
+  var cancelBtn=document.createElement('button');cancelBtn.className='btn btn-ghost';cancelBtn.textContent='取消';cancelBtn.onclick=function(){popup.remove();};
+  actWrap.appendChild(okBtn);actWrap.appendChild(cancelBtn);popup.appendChild(actWrap);
+  document.body.appendChild(popup);
+}
+
+function confirmGenerate(){
+  var selected=[];
+  document.querySelectorAll('#month-picker-popup .btn-primary[data-ym]').forEach(function(b){selected.push(b.dataset.ym);});
+  if(!selected.length){alert('請至少選擇一個月份');return;}
+  document.getElementById('month-picker-popup').remove();
+  var allSchedule=[];
+  selected.forEach(function(ym){
+    var p=ym.split('-');
+    buildScheduleForMonth(parseInt(p[0]),parseInt(p[1])).forEach(function(r){allSchedule.push(r);});
+  });
+  allSchedule.forEach(function(r,i){r.id=i;});
+  schedule=allSchedule;excluded=new Set();
+  var fp=selected[0].split('-');
+  document.getElementById('target-month').value=selected[0];
+  dvDate=new Date(parseInt(fp[0]),parseInt(fp[1])-1,1);
+  for(var i=0;i<schedule.length;i++)schedule[i].color=getTechColor(schedule[i].technician||'');
+  document.getElementById('hint').style.display='none';
+  document.getElementById('main-table').style.display='table';
+  document.getElementById('save-btn').style.display='inline-flex';
+  document.getElementById('download-btn').style.display='inline-flex';
+  loadHolidayInput();buildTechFilters();renderAll();renderDayView();renderWorkload();
+  var ss=document.getElementById('save-status');
+  ss.style.display='flex';ss.innerHTML='✅ 已產生 '+allSchedule.length+' 筆排班';
+  setTimeout(function(){ss.style.display='none';},3000);
+  pushUndo();autoSave();
+}
+
+function copyNextMonth(){
+  if(!schedule.length){alert('請先產生本月排班');return;}
+  var cur=document.getElementById('target-month').value;
+  if(!cur){alert('請先產生排班');return;}
+  var p=cur.split('-');
+  var nd=new Date(parseInt(p[0]),parseInt(p[1]),1);
+  var ny=nd.getFullYear(),nm=nd.getMonth()+1;
+  var nym=ny+'-'+String(nm).padStart(2,'0');
+  if(!confirm('要複製排班到 '+ny+'年'+nm+'月 嗎？\n防治師保持不變，日期依規律重算。'))return;
+  var techMap={};schedule.forEach(function(r){techMap[r.name]=r.technician;});
+  var ns=buildScheduleForMonth(ny,nm);
+  ns.forEach(function(r){
+    if(techMap[r.name])r.technician=techMap[r.name];
+    r.color=getTechColor(r.technician||'');r.modified=false;
+  });
+  schedule=ns;excluded=new Set();
+  document.getElementById('target-month').value=nym;
+  dvDate=new Date(ny,nm-1,1);
+  if(typeof wvCurrentWeek!=='undefined')wvCurrentWeek=0;
+  loadHolidayInput();buildTechFilters();renderAll();renderDayView();renderWorkload();
+  var ss=document.getElementById('save-status');
+  ss.style.display='flex';ss.innerHTML='📋 已複製到 '+ny+'年'+nm+'月，共 '+ns.length+' 筆';
+  setTimeout(function(){ss.style.display='none';},4000);
+  pushUndo();autoSave();
+}
+
+function downloadSchedule(){
+  if(!schedule.length){alert('目前沒有排班資料');return;}
+  var month=document.getElementById('target-month').value||'unknown';
+  var payload=JSON.stringify({version:3,month:month,savedAt:new Date().toISOString(),excluded:Array.from(excluded),schedule:schedule},null,2);
+  var blob=new Blob([payload],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='排班_'+month+'.json';a.click();
+  URL.revokeObjectURL(url);
+  var ss=document.getElementById('save-status');
+  ss.style.display='flex';ss.innerHTML='⬇️ 已下載排班_'+month+'.json';
+  setTimeout(function(){ss.style.display='none';},3000);
+}
+
+function loadScheduleFile(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(!data.schedule||!Array.isArray(data.schedule))throw new Error('格式不正確');
+      schedule=data.schedule;excluded=new Set(data.excluded||[]);
+      for(var i=0;i<schedule.length;i++)schedule[i].color=getTechColor(schedule[i].technician||'');
+      if(data.month)document.getElementById('target-month').value=data.month;
+      var parts=(data.month||'2026-05').split('-');
+      dvDate=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1);
+      if(typeof wvCurrentWeek!=='undefined')wvCurrentWeek=0;
+      document.getElementById('hint').style.display='none';
+      document.getElementById('main-table').style.display='table';
+      document.getElementById('save-btn').style.display='inline-flex';
+      document.getElementById('download-btn').style.display='inline-flex';
+      loadHolidayInput();buildTechFilters();renderAll();renderDayView();renderWorkload();
+      pushUndo();autoSave();
+      var ss=document.getElementById('save-status');
+      ss.style.display='flex';
+      ss.innerHTML='📂 已載入 '+file.name+'，共 '+schedule.length+' 筆'+(data.savedAt?' ('+data.savedAt.replace('T',' ').slice(0,16)+')':'');
+      setTimeout(function(){ss.style.display='none';},4000);
+    }catch(err){alert('載入失敗：'+err.message);}
+    input.value='';
+  };
+  reader.readAsText(file,'utf-8');
+}
+</script>
 </body>
 </html>
