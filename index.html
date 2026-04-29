@@ -4239,7 +4239,8 @@ function renderAdjView(){
             var jobDiv=document.createElement('div');
             jobDiv.className='wv-job';
             jobDiv.draggable=!jj.row.fixed;
-            if(jj.row.fixed){jobDiv.style.cursor='default';}
+            // 固定客戶在調整模式：不可拖曳，但可點選換防治師
+            jobDiv.style.cursor='pointer';
             jobDiv.style.background=tc.bg;jobDiv.style.borderLeftColor=tc.border;jobDiv.style.color=tc.text;
             jobDiv.style.position='relative';
             if(isChg)jobDiv.style.boxShadow='0 0 0 2px #ef4444';
@@ -4261,6 +4262,7 @@ function renderAdjView(){
             tm.textContent=minToStr(jj.row.startMin)+'–'+minToStr(jj.row.startMin+jj.row.duration);
             jobDiv.appendChild(nm);jobDiv.appendChild(tm);
             if(!jj.row.fixed){
+              // 非固定客戶：可拖曳 + 點選換日期或防治師
               (function(xsi,xdi,xDiv){
                 xDiv.addEventListener('dragstart',function(e){
                   _adjDragSi=xsi;_adjDragDi=xdi;
@@ -4269,7 +4271,12 @@ function renderAdjView(){
                   setTimeout(function(){xDiv.classList.add('wv-dragging');},0);
                 });
                 xDiv.addEventListener('dragend',function(){xDiv.classList.remove('wv-dragging');});
-                xDiv.addEventListener('click',function(e){e.stopPropagation();_openAdjTechPop(xsi,xdi,e);});
+                xDiv.addEventListener('click',function(e){e.stopPropagation();_openAdjTechPop(xsi,xdi,e,true);});
+              })(jj.si,jj.di,jobDiv);
+            } else {
+              // 固定客戶：只能點選換防治師（不可換日期）
+              (function(xsi,xdi,xDiv){
+                xDiv.addEventListener('click',function(e){e.stopPropagation();_openAdjTechPop(xsi,xdi,e,false);});
               })(jj.si,jj.di,jobDiv);
             }
             slotDiv.appendChild(jobDiv);
@@ -4318,7 +4325,7 @@ function renderAdjView(){
   });
 }
 
-function _openAdjTechPop(si,di,e){
+function _openAdjTechPop(si,di,e,allowDate){
   var row=schedule[si];
   var origRow=_adjSnap[si];
   var origTech=origRow?origRow.technician:row.technician;
@@ -4333,63 +4340,99 @@ function _openAdjTechPop(si,di,e){
   title.title=row.name;title.textContent=row.name;
   popup.appendChild(title);
 
-  // ── 換日期區塊 ──
-  var dateSection=document.createElement('div');
-  dateSection.style.cssText='padding:6px 10px 6px;border-bottom:1px solid var(--border);';
-  var dateLabel=document.createElement('div');
-  dateLabel.style.cssText='font-size:10px;color:var(--text3);margin-bottom:5px;letter-spacing:.04em;';
-  dateLabel.textContent='📅 更換日期';
-  var dateRow=document.createElement('div');
-  dateRow.style.cssText='display:flex;gap:6px;align-items:center;';
-  var dateInput=document.createElement('input');
-  dateInput.type='date';
-  dateInput.value=row.dates[di].dateStr||origDateStr;
-  dateInput.style.cssText='flex:1;border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12px;color:var(--text);outline:none;';
-  var dateBtn=document.createElement('button');
-  dateBtn.textContent='確認';
-  dateBtn.style.cssText='background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;';
-  dateBtn.addEventListener('click',function(evt){
-    evt.stopPropagation();
-    var newIso=dateInput.value;
-    if(!newIso){return;}
-    var currTech=row.technician;
-    row.dates[di].dateStr=newIso;
-    var key=si+'_'+di;
-    if(newIso===origDateStr&&currTech===origTech){delete _adjChanges[key];}
-    else{_adjChanges[key]={si:si,di:di,name:row.name,oldDateStr:origDateStr,newDateStr:newIso,oldTech:origTech,newTech:currTech};}
-    popup.style.display='none';
-    renderAdjView();_renderAdjPanel();_updateAdjBanner();
-  });
-  dateRow.appendChild(dateInput);dateRow.appendChild(dateBtn);
-  dateSection.appendChild(dateLabel);dateSection.appendChild(dateRow);
-  popup.appendChild(dateSection);
+  // ── 換日期區塊（僅非固定客戶可用）──
+  if(allowDate){
+    var dateSection=document.createElement('div');
+    dateSection.style.cssText='padding:6px 10px 6px;border-bottom:1px solid var(--border);';
+    var dateLabel=document.createElement('div');
+    dateLabel.style.cssText='font-size:10px;color:var(--text3);margin-bottom:5px;letter-spacing:.04em;';
+    dateLabel.textContent='📅 更換日期';
+    var dateRow=document.createElement('div');
+    dateRow.style.cssText='display:flex;gap:6px;align-items:center;';
+    var dateInput=document.createElement('input');
+    dateInput.type='date';
+    dateInput.value=row.dates[di].dateStr||origDateStr;
+    dateInput.style.cssText='flex:1;border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12px;color:var(--text);outline:none;';
+    var dateBtn=document.createElement('button');
+    dateBtn.textContent='確認';
+    dateBtn.style.cssText='background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;';
+    dateBtn.addEventListener('click',function(evt){
+      evt.stopPropagation();
+      var newIso=dateInput.value;
+      if(!newIso){return;}
+      var currTech=row.technician;
+      row.dates[di].dateStr=newIso;
+      var key=si+'_'+di;
+      if(newIso===origDateStr&&currTech===origTech){delete _adjChanges[key];}
+      else{_adjChanges[key]={si:si,di:di,name:row.name,oldDateStr:origDateStr,newDateStr:newIso,oldTech:origTech,newTech:currTech};}
+      popup.style.display='none';
+      renderAdjView();_renderAdjPanel();_updateAdjBanner();
+    });
+    dateRow.appendChild(dateInput);dateRow.appendChild(dateBtn);
+    dateSection.appendChild(dateLabel);dateSection.appendChild(dateRow);
+    popup.appendChild(dateSection);
+  } else {
+    // 固定客戶提示
+    var fixedNote=document.createElement('div');
+    fixedNote.style.cssText='padding:5px 10px 5px;font-size:10px;color:#6b7280;border-bottom:1px solid var(--border);';
+    fixedNote.textContent='🔒 固定日期，僅可更換防治師';
+    popup.appendChild(fixedNote);
+  }
 
-  // ── 換防治師區塊 ──
+  // ── 換防治師區塊（勾選即套用，無需確認鍵）──
   var techLabel=document.createElement('div');
   techLabel.style.cssText='font-size:10px;color:var(--text3);padding:5px 10px 3px;letter-spacing:.04em;';
-  techLabel.textContent='👤 更換防治師';
+  techLabel.textContent='👤 防治師（可複選，勾選即生效）';
   popup.appendChild(techLabel);
+
+  // 解析目前已選的防治師（可能是逗號分隔多位）
+  var currTechStr=row.technician||'';
+  var selectedTechs=currTechStr.split(',').map(function(t){return t.trim();}).filter(Boolean);
+  var checkboxMap={};
+
+  function _applyTechSelection(){
+    var newTechs=TECH_ORDER.filter(function(t){return checkboxMap[t]&&checkboxMap[t].selected;});
+    if(!newTechs.length)return;// 至少保留一位，不允許全取消
+    var newTechStr=newTechs.join(',');
+    var xrow=schedule[si];
+    var currDate=xrow.dates[di].dateStr;
+    xrow.technician=newTechStr;xrow.color=getTechColor(newTechs[0]);
+    var key=si+'_'+di;
+    if(currDate===origDateStr&&newTechStr===origTech){delete _adjChanges[key];}
+    else{_adjChanges[key]={si:si,di:di,name:xrow.name,oldDateStr:origDateStr,newDateStr:currDate,oldTech:origTech,newTech:newTechStr};}
+    _renderAdjPanel();_updateAdjBanner();
+    // 不關 popup，讓使用者繼續調整
+  }
 
   TECH_ORDER.forEach(function(tn){
     var tc=TECH_COLORS[tn]||DEF_COLOR;
+    var isSelected=selectedTechs.indexOf(tn)>=0;
     var opt=document.createElement('div');
-    opt.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--text);'+(tn===row.technician?'font-weight:600;background:var(--surface2);':'');
-    opt.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+tc.border+';display:inline-block;flex-shrink:0;"></span>'+tn+(tn===row.technician?' ✓':'');
-    opt.addEventListener('mouseenter',function(){opt.style.background='var(--surface2)';});
-    opt.addEventListener('mouseleave',function(){opt.style.background=tn===row.technician?'var(--surface2)':'';});
-    (function(xtn,xsi,xdi){
-      opt.addEventListener('click',function(evt){
-        evt.stopPropagation();
-        var xrow=schedule[xsi];
-        var currDate=xrow.dates[xdi].dateStr;
-        xrow.technician=xtn;xrow.color=getTechColor(xtn);
-        var key=xsi+'_'+xdi;
-        if(currDate===origDateStr&&xtn===origTech){delete _adjChanges[key];}
-        else{_adjChanges[key]={si:xsi,di:xdi,name:xrow.name,oldDateStr:origDateStr,newDateStr:currDate,oldTech:origTech,newTech:xtn};}
-        popup.style.display='none';
-        renderAdjView();_renderAdjPanel();_updateAdjBanner();
-      });
-    })(tn,si,di);
+    opt.style.cssText='display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--text);user-select:none;'+(isSelected?'background:var(--surface2);font-weight:600;':'');
+    var chkBox=document.createElement('span');
+    chkBox.style.cssText='width:14px;height:14px;border-radius:3px;border:1.5px solid '+(isSelected?tc.border:'#d1d5db')+';background:'+(isSelected?tc.bg:'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;transition:all .1s;';
+    chkBox.textContent=isSelected?'✓':'';
+    var dot=document.createElement('span');
+    dot.style.cssText='width:8px;height:8px;border-radius:50%;background:'+tc.border+';display:inline-block;flex-shrink:0;';
+    var lbl=document.createElement('span');lbl.textContent=tn;
+    opt.appendChild(chkBox);opt.appendChild(dot);opt.appendChild(lbl);
+    checkboxMap[tn]={el:opt,chk:chkBox,selected:isSelected,tc:tc};
+    opt.addEventListener('click',function(evt){
+      evt.stopPropagation();
+      var st=checkboxMap[tn];
+      // 若目前只剩一位且要取消，不允許
+      var currentSelected=TECH_ORDER.filter(function(t){return checkboxMap[t]&&checkboxMap[t].selected;});
+      if(st.selected&&currentSelected.length<=1)return;
+      st.selected=!st.selected;
+      if(st.selected){
+        st.chk.style.borderColor=st.tc.border;st.chk.style.background=st.tc.bg;st.chk.textContent='✓';
+        st.el.style.background='var(--surface2)';st.el.style.fontWeight='600';
+      } else {
+        st.chk.style.borderColor='#d1d5db';st.chk.style.background='transparent';st.chk.textContent='';
+        st.el.style.background='';st.el.style.fontWeight='';
+      }
+      _applyTechSelection();
+    });
     popup.appendChild(opt);
   });
 
