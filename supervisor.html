@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="description" content="防治排班 — 主管調整模式 v1.0">
+<title>主管調整模式 — 防治排班</title>
+
+<!-- ═══════════════════════════════════════════════════════
+     Firebase 設定（與 index.html 共用同一個專案）
+     ═══════════════════════════════════════════════════════ -->
+<script type="module" id="firebase-init">
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDjiZ6OUKPBdWQRemlmQQ2NLziidzi69JE",
+  authDomain:        "pest-schedule.firebaseapp.com",
+  databaseURL:       "https://pest-schedule-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "pest-schedule",
+  storageBucket:     "pest-schedule.firebasestorage.app",
+  messagingSenderId: "796886986735",
+  appId:             "1:796886986735:web:737daa1f333ecfcb06101a"
+};
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, get }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+window._fb = { ready:false };
+try{
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db  = getDatabase(app);
+  window._fb = { ready:true, db, ref, set, onValue, get };
+  console.log('[Firebase] 主管端初始化成功');
+}catch(e){
+  console.warn('[Firebase] 初始化失敗', e);
+}
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+:root{
+  --bg:#f8f9fa;--surface:#ffffff;--surface2:#f0f2f5;--border:#e5e7eb;
+  --accent:#7c3aed;--accent2:#5b21b6;--green:#15803d;--orange:#c2610a;
+  --red:#c81e3a;--yellow:#b45309;--text:#1a2540;--text2:#4b5563;--text3:#9ca3af;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans TC',sans-serif;font-weight:300;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;color-scheme:light;}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;z-index:200;}
+.logo{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+.tag-supervisor{font-size:9px;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:4px;padding:2px 7px;margin-left:4px;letter-spacing:.05em;}
+
+.btn{border:none;cursor:pointer;border-radius:8px;padding:7px 14px;font-family:'Noto Sans TC',sans-serif;font-size:12px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:5px;}
+.btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent2);}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-success{background:var(--green);color:#fff;}.btn-success:hover{filter:brightness(.95);}
+.btn-danger{background:var(--red);color:#fff;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+.month-picker{display:flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;}
+.month-picker label{font-size:11px;color:var(--text2);}
+.month-picker input[type=month]{background:none;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;width:130px;color-scheme:light;cursor:pointer;}
+
+.stat-chips{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;}
+.stat-chip{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font-size:11px;color:var(--text2);}
+.stat-chip span{color:var(--text);font-weight:400;margin-left:3px;}
+.stat-chip.changed{border-color:var(--accent);color:var(--accent);}
+.stat-chip.changed span{color:var(--accent);}
+
+#sync-status{font-size:11px;display:none;align-items:center;gap:4px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);}
+
+/* 提示橫條 */
+.adj-banner{display:flex;align-items:center;gap:8px;padding:7px 14px;background:rgba(124,58,237,.08);border-bottom:1px solid rgba(124,58,237,.25);font-size:12px;color:var(--accent2);flex-shrink:0;flex-wrap:wrap;}
+.adj-banner .pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;animation:_adjPulse 1.4s infinite;flex-shrink:0;}
+@keyframes _adjPulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+/* 主體 */
+.main{flex:1;display:flex;overflow:hidden;}
+.wv-scroll{flex:1;overflow:auto;padding:0;background:var(--bg);}
+.adj-panel{width:240px;border-left:1px solid var(--border);flex-shrink:0;background:var(--surface2);overflow-y:auto;}
+
+/* 週覽表格 */
+.wv-table{width:100%;border-collapse:collapse;table-layout:fixed;}
+.wv-th-tech{width:90px;min-width:90px;background:var(--surface2);border:1px solid var(--border);padding:6px 4px;font-size:13px;text-align:center;color:var(--text2);position:sticky;left:0;z-index:10;}
+.wv-th-day{background:var(--surface2);border:1px solid var(--border);padding:6px 4px;font-size:13px;text-align:center;color:var(--text2);}
+.wv-th-day.today{background:rgba(124,58,237,.12);color:var(--accent);}
+.wv-th-day.holiday{background:rgba(200,30,58,.07);color:var(--red);}
+.wv-cell{border:1px solid var(--border);padding:3px;vertical-align:top;min-height:52px;position:relative;background:#fff;}
+.wv-cell.holiday-col{background:rgba(200,30,58,.03);}
+.wv-cell.tech-label{background:var(--surface2);font-size:11px;font-weight:400;text-align:center;color:var(--text2);padding:4px 2px;position:sticky;left:0;z-index:5;}
+.wv-cell.on-hol{background:rgba(194,97,10,.06);}
+.wv-cell.wv-drag-over{background:rgba(124,58,237,.10)!important;outline:2px dashed var(--accent);outline-offset:-2px;}
+
+.wv-job{border-radius:4px;padding:4px 7px;margin-bottom:3px;font-size:13px;cursor:grab;border-left:3px solid;line-height:1.4;transition:filter .12s,opacity .15s;position:relative;}
+.wv-job:hover{filter:brightness(1.08);}
+.wv-job.wv-dragging{opacity:.35;cursor:grabbing;}
+.wv-job-name{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wv-job-time{font-size:12px;font-family:'DM Mono',monospace;opacity:.8;margin-top:2px;}
+
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);gap:14px;padding:30px;text-align:center;}
+.empty-state .icon{font-size:54px;opacity:.25;}
+.empty-state h2{font-size:15px;color:var(--text2);font-weight:400;}
+.empty-state p{font-size:12px;line-height:1.7;max-width:380px;}
+
+/* 變更清單面板 */
+.adj-panel-title{font-size:11px;font-weight:500;color:var(--text2);padding:11px 12px 8px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:1;}
+.adj-change-item{padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px;}
+.adj-change-name{font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;}
+.adj-tag{font-size:9px;padding:1px 5px;border-radius:3px;display:inline-block;margin-right:3px;}
+.adj-tag-date{background:#fee2e2;color:#991b1b;}
+.adj-tag-tech{background:#dcfce7;color:#14532d;}
+.adj-tag-both{background:#fef3c7;color:#92400e;}
+.adj-diff{font-size:11px;color:var(--text2);margin-top:1px;}
+.adj-diff .old{text-decoration:line-through;color:var(--text3);}
+.adj-diff .new{color:var(--green);font-weight:500;}
+
+.adj-panel-actions{padding:10px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border);background:var(--surface2);position:sticky;bottom:0;}
+
+/* 換防治師/換日期 popup */
+#adj-tech-popup{display:none;position:fixed;z-index:1100;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);min-width:200px;max-height:420px;overflow-y:auto;}
+
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:#c4c8d0;}
+
+/* 載入動畫 */
+.spinner{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">✏️</div>
+    防治排班 <span class="tag-supervisor">主管調整模式</span>
+  </div>
+
+  <div class="month-picker">
+    <label>月份</label>
+    <input type="month" id="target-month" oninput="onMonthChange()">
+  </div>
+
+  <button class="btn btn-ghost" onclick="reloadSchedule()" title="重新從雲端讀取最新排班">🔄 重新載入</button>
+  <button class="btn btn-ghost" onclick="resetAllChanges()" id="btn-reset" title="清除所有調整、回到原始排班" disabled>↩ 全部還原</button>
+  <button class="btn btn-primary" onclick="saveDraft()" id="btn-save" title="儲存草稿到雲端，主排班端會看到通知" disabled>💾 儲存草稿</button>
+
+  <div id="sync-status"></div>
+
+  <div class="stat-chips">
+    <div class="stat-chip">本月案場<span id="s-jobs">—</span></div>
+    <div class="stat-chip changed" id="chip-changed" style="display:none">已調整<span id="s-changed">0</span></div>
+  </div>
+</header>
+
+<!-- 提示橫條 -->
+<div class="adj-banner" id="adj-banner">
+  <span class="pulse"></span>
+  <span>調整模式 — 拖曳案場可換日期或防治師。<b>點擊案場</b>可使用日期/防治師選單。<b style="font-weight:500;">紫框 = 已調整</b>。儲存草稿後，主排班端會看到通知。</span>
+</div>
+
+<!-- 主體：週覽 + 變更清單 -->
+<div class="main">
+  <div class="wv-scroll" id="wv-scroll">
+    <div id="wv-content" style="min-width:600px;">
+      <div class="empty-state">
+        <div class="icon">⏳</div>
+        <h2>正在載入雲端排班…</h2>
+        <p>若超過 5 秒仍未顯示，請確認網路連線並重新整理頁面，或選擇要調整的月份。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="adj-panel" id="adj-panel">
+    <div class="adj-panel-title">變更清單</div>
+    <div id="adj-change-list">
+      <div style="padding:24px 12px;font-size:12px;color:var(--text3);text-align:center;">尚無變更</div>
+    </div>
+    <div class="adj-panel-actions">
+      <button class="btn btn-success" onclick="saveDraft()" id="btn-save-2" disabled>💾 儲存草稿到雲端</button>
+      <button class="btn btn-ghost" onclick="resetAllChanges()" id="btn-reset-2" disabled>↩ 全部還原</button>
+    </div>
+  </div>
+</div>
+
+<!-- 換防治師 / 換日期 popup -->
+<div id="adj-tech-popup" onclick="event.stopPropagation()"></div>
+
+<script>
+// ════════════════════════════════════════════════
+// 共用資料 / 工具函式
+// ════════════════════════════════════════════════
+var schedule=[];           // 從 Firebase 讀取的排班資料
+var excluded=new Set();    // 排除的客戶
+var _adjSnap=null;         // 原始快照，用於比對是否已變動
+var _adjChanges={};        // 變更紀錄 {key -> {si,di,name,oldDateStr,newDateStr,oldTech,newTech}}
+var _adjDragSi=null,_adjDragDi=null;
+var _loaded=false;
+
+var TECH_ORDER=['Casual2','Ivan','HB','Jane','Ray','Errko','Tom','george','Daniel','Hubert','Casual'];
+var TECH_COLORS={
+  'Casual2':{bg:'#f1f5f9',border:'#475569',text:'#1a2540'},
+  'Ivan':{bg:'#f0f4fc',border:'#2563a8',text:'#1a2540'},
+  'HB':{bg:'#f0faf4',border:'#15803d',text:'#1a2540'},
+  'Jane':{bg:'#fef6f0',border:'#c2610a',text:'#1a2540'},
+  'Ray':{bg:'#f4f0fc',border:'#6d28d9',text:'#1a2540'},
+  'Daniel':{bg:'#f0fafe',border:'#0e7490',text:'#1a2540'},
+  'Hubert':{bg:'#fff7ed',border:'#c2610a',text:'#1a2540'},
+  'Casual':{bg:'#fdf0f8',border:'#db2777',text:'#1a2540'},
+  'Errko':{bg:'#f4fce8',border:'#4d7c0f',text:'#1a2540'},
+  'Tom':{bg:'#f0fdf8',border:'#0f766e',text:'#1a2540'},
+  'george':{bg:'#fdf0f8',border:'#9d174d',text:'#1a2540'}
+};
+var DEF_COLOR={bg:'rgba(150,150,200,.15)',border:'#9696c8',text:'#4b5563'};
+var HOLIDAYS_TW=['2026-01-01','2026-01-28','2026-01-29','2026-01-30','2026-01-31','2026-02-01','2026-02-02','2026-02-28','2026-04-04','2026-04-05','2026-05-01','2026-06-19','2026-09-28','2026-10-10',
+  '2027-01-01','2027-01-15','2027-01-16','2027-01-17','2027-01-18','2027-01-19','2027-01-20','2027-02-28','2027-04-04','2027-04-05','2027-05-01','2027-06-08','2027-09-17','2027-10-10'];
+
+var TEAPOT_IMG='<span style="font-size:14px;">🫖</span>';
+
+function toISO(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function minToStr(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function getTechColor(tech){var t=(tech||'').split(',')[0].trim();return TECH_COLORS[t]||DEF_COLOR;}
+function isHolidayTW(s){return HOLIDAYS_TW.indexOf(s)>=0;}
+
+// ════════════════════════════════════════════════
+// 月份初始化
+// ════════════════════════════════════════════════
+function getDefaultMonth(){
+  // 預設下個月
+  var d=new Date();d.setDate(1);d.setMonth(d.getMonth()+1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+
+function initMonth(){
+  var inp=document.getElementById('target-month');
+  // 嘗試讀取上次使用過的月份
+  var last='';
+  try{last=localStorage.getItem('supervisor_last_month')||'';}catch(e){}
+  inp.value=last||getDefaultMonth();
+}
+
+function onMonthChange(){
+  var m=document.getElementById('target-month').value;
+  if(!m)return;
+  try{localStorage.setItem('supervisor_last_month',m);}catch(e){}
+  // 切換月份視同重新整理
+  if(Object.keys(_adjChanges).length){
+    if(!confirm('切換月份會清除目前未儲存的調整，確定要切換？'))
+      {return;}
+  }
+  reloadSchedule();
+}
+
+// ════════════════════════════════════════════════
+// Firebase：讀取排班、儲存草稿、載入既有草稿
+// ════════════════════════════════════════════════
+function _setSyncStatus(text,color,borderColor,autoHide){
+  var s=document.getElementById('sync-status');
+  s.style.display='flex';
+  s.style.color=color||'var(--text3)';
+  s.style.borderColor=borderColor||'var(--border)';
+  s.innerHTML=text;
+  if(autoHide){setTimeout(function(){s.style.display='none';},autoHide);}
+}
+
+function reloadSchedule(){
+  var month=document.getElementById('target-month').value;
+  if(!month){alert('請先選擇月份');return;}
+  if(!window._fb||!window._fb.ready){
+    _showLoadFail('Firebase 未連線。請確認網路後重新整理。');
+    return;
+  }
+  _setSyncStatus('<span class="spinner"></span> 從雲端讀取中…','var(--text3)','var(--border)');
+  var fb=window._fb;
+  var path='schedules/'+month.replace('-','_');
+  var dbRef=fb.ref(fb.db,path);
+  fb.get(dbRef).then(function(snap){
+    var data=snap.val();
+    if(!data||!data.schedule||!data.schedule.length){
+      _showLoadFail('雲端找不到 '+month+' 的排班資料。請確認該月份是否已產生排班。');
+      schedule=[];excluded=new Set();_adjSnap=null;_adjChanges={};
+      _loaded=false;_renderAll();return;
+    }
+    schedule=data.schedule;
+    // 反序列化 dates 中的 date 物件
+    schedule.forEach(function(r){
+      if(!r.dates)r.dates=[];
+      r.dates.forEach(function(de){
+        if(de.dateStr&&!de.date)de.date=new Date(de.dateStr+'T00:00:00');
+      });
+      r.color=getTechColor(r.technician||'');
+    });
+    excluded=new Set(data.excluded||[]);
+    _adjSnap=JSON.parse(JSON.stringify(schedule));
+    _adjChanges={};
+    _loaded=true;
+    _setSyncStatus('☁️ 已載入','var(--green)','rgba(21,128,61,.3)',2500);
+    // 同時嘗試讀取既有草稿，若有就提示
+    _loadExistingDraft(month);
+    _renderAll();
+  }).catch(function(e){
+    console.error(e);
+    _showLoadFail('讀取失敗：'+e.message);
+  });
+}
+
+function _loadExistingDraft(month){
+  var fb=window._fb;if(!fb||!fb.ready)return;
+  var dbRef=fb.ref(fb.db,'draft/'+month.replace('-','_'));
+  fb.get(dbRef).then(function(snap){
+    var data=snap.val();
+    if(!data||!data.changes||!Object.keys(data.changes).length)return;
+    var n=Object.keys(data.changes).length;
+    if(!confirm('雲端已有一份未套用的草稿（共 '+n+' 筆變更）。要把那份草稿載入繼續編輯嗎？\n\n按「確定」載入舊草稿；按「取消」忽略並重新開始。')){return;}
+    // 套用 _adjChanges 並對 schedule 同步調整
+    Object.keys(data.changes).forEach(function(k){
+      var c=data.changes[k];
+      var row=schedule[c.si];if(!row||!row.dates||!row.dates[c.di])return;
+      if(c.newDateStr){
+        row.dates[c.di].dateStr=c.newDateStr;
+        row.dates[c.di].date=new Date(c.newDateStr+'T00:00:00');
+      }
+      if(c.newTech){
+        row.technician=c.newTech;
+        row.color=getTechColor(c.newTech);
+      }
+    });
+    _adjChanges=data.changes;
+    _renderAll();
+    _setSyncStatus('📋 已載入既有草稿（'+n+' 筆）','var(--accent2)','rgba(91,33,182,.3)',3500);
+  }).catch(function(){/* 沒草稿就略過 */});
+}
+
+function _showLoadFail(msg){
+  _setSyncStatus('⚠️ 讀取失敗','var(--red)','rgba(200,30,58,.3)',5000);
+  document.getElementById('wv-content').innerHTML=
+    '<div class="empty-state"><div class="icon">⚠️</div><h2>無法載入排班</h2><p>'+
+    msg.replace(/</g,'&lt;')+'</p></div>';
+  document.getElementById('s-jobs').textContent='—';
+}
+
+function saveDraft(){
+  var n=Object.keys(_adjChanges).length;
+  if(!n){alert('目前尚無任何變更，請先調整行程再儲存草稿');return;}
+  if(!window._fb||!window._fb.ready){alert('Firebase 未連線，無法儲存草稿');return;}
+  var month=document.getElementById('target-month').value;
+  if(!month){alert('請先選擇月份');return;}
+  var fb=window._fb;
+  var payload={changes:_adjChanges,savedAt:Date.now(),month:month,count:n};
+  var dbRef=fb.ref(fb.db,'draft/'+month.replace('-','_'));
+  _setSyncStatus('<span class="spinner"></span> 儲存中…','var(--text3)','var(--border)');
+  fb.set(dbRef,payload).then(function(){
+    _setSyncStatus('💾 草稿已儲存','var(--accent)','rgba(124,58,237,.3)',4000);
+    alert('✅ 草稿已儲存到雲端！\n\n共 '+n+' 筆變更。\n排班負責人下次打開系統就會看到通知。');
+  }).catch(function(e){
+    _setSyncStatus('⚠️ 儲存失敗','var(--red)','rgba(200,30,58,.3)',5000);
+    alert('草稿儲存失敗：'+e.message);
+  });
+}
+
+function resetAllChanges(){
+  if(!Object.keys(_adjChanges).length){return;}
+  if(!confirm('確定要清除目前所有調整？將回到雲端原始排班。'))return;
+  if(_adjSnap)schedule=JSON.parse(JSON.stringify(_adjSnap));
+  // schedule 失去 date 物件，需重新建立
+  schedule.forEach(function(r){
+    if(!r.dates)r.dates=[];
+    r.dates.forEach(function(de){if(de.dateStr&&!(de.date instanceof Date))de.date=new Date(de.dateStr+'T00:00:00');});
+    r.color=getTechColor(r.technician||'');
+  });
+  _adjChanges={};
+  _renderAll();
+  _setSyncStatus('↩ 已還原','var(--text2)','var(--border)',2500);
+}
+
+// ════════════════════════════════════════════════
+// 渲染：週覽（永遠在調整模式）
+// ════════════════════════════════════════════════
+function getMonthWeeks(){
+  var month=document.getElementById('target-month').value;
+  if(!month)return[];
+  var parts=month.split('-');var y=parseInt(parts[0]);var m=parseInt(parts[1]);
+  var weeks=[];var weekDays=[];
+  var daysInMonth=new Date(y,m,0).getDate();
+  for(var d=1;d<=daysInMonth;d++){
+    var date=new Date(y,m-1,d);
+    var dow=date.getDay();var iso=toISO(date);
+    if(dow===0||dow===6)continue;// 跳過週末
+    weekDays.push({iso:iso,date:date,isHol:isHolidayTW(iso)});
+    if(dow===5||d===daysInMonth){
+      if(weekDays.length)weeks.push(weekDays.slice());
+      weekDays=[];
+    }
+  }
+  if(weekDays.length)weeks.push(weekDays.slice());
+  return weeks;
+}
+
+function _renderAll(){
+  _renderWeekView();
+  _renderAdjPanel();
+  _updateChips();
+}
+
+function _renderWeekView(){
+  var content=document.getElementById('wv-content');
+  if(!_loaded||!schedule.length){
+    if(_loaded){
+      content.innerHTML='<div class="empty-state"><div class="icon">📭</div><h2>本月雲端無排班資料</h2><p>請先請排班負責人在主系統產生並上傳本月排班。</p></div>';
+    }
+    return;
+  }
+  var weeks=getMonthWeeks();
+  if(!weeks.length){
+    content.innerHTML='<div class="empty-state"><div class="icon">📆</div><h2>請選擇月份</h2></div>';
+    return;
+  }
+  content.innerHTML='';
+  var todayIso=toISO(new Date());
+
+  weeks.forEach(function(wk,wi){
+    // Week separator
+    var sep=document.createElement('div');
+    sep.style.cssText='font-size:10px;font-weight:500;color:var(--text3);background:var(--surface2);padding:5px 12px;border-bottom:1px solid var(--border);'+(wi>0?'border-top:2px solid var(--border);':'');
+    var f=wk[0];var l=wk[wk.length-1];
+    sep.textContent='W'+(wi+1)+'  '+(f.date.getMonth()+1)+'/'+(f.date.getDate())+'–'+(l.date.getMonth()+1)+'/'+l.date.getDate();
+    content.appendChild(sep);
+
+    var table=document.createElement('table');table.className='wv-table';
+    // Header
+    var thead=document.createElement('thead');var htr=document.createElement('tr');
+    var thT=document.createElement('th');thT.className='wv-th-tech';thT.textContent='防治師';htr.appendChild(thT);
+    wk.forEach(function(day){
+      var th=document.createElement('th');th.className='wv-th-day';
+      if(day.iso===todayIso)th.classList.add('today');
+      if(day.isHol)th.classList.add('holiday');
+      var dow=['日','一','二','三','四','五','六'][day.date.getDay()];
+      th.innerHTML=(day.date.getMonth()+1)+'/'+day.date.getDate()+'<br><span style="font-size:9px;opacity:.7">週'+dow+'</span>'+(day.isHol?'<br><span style="font-size:9px;color:var(--red)">假日</span>':'');
+      htr.appendChild(th);
+    });
+    thead.appendChild(htr);table.appendChild(thead);
+
+    var tbody=document.createElement('tbody');
+    TECH_ORDER.forEach(function(tn){
+      var tc=TECH_COLORS[tn]||DEF_COLOR;
+      var tr=document.createElement('tr');
+      var tdL=document.createElement('td');tdL.className='wv-cell tech-label';tdL.textContent=tn;
+      tdL.style.borderLeft='3px solid '+tc.border;tr.appendChild(tdL);
+
+      wk.forEach(function(day){
+        var td=document.createElement('td');
+        td.className='wv-cell'+(day.isHol?' holiday-col':'');
+        td.dataset.iso=day.iso;td.dataset.tech=tn;
+        td.style.padding='0';td.style.verticalAlign='top';
+
+        // 收集當日該防治師的工作
+        var cellJobs=[];
+        for(var si=0;si<schedule.length;si++){
+          var row=schedule[si];
+          if(excluded.has(row.name))continue;
+          var techArr=(row.technician||'').split(',').map(function(t){return t.trim();});
+          if(techArr.indexOf(tn)<0)continue;
+          for(var di=0;di<row.dates.length;di++){
+            if(row.dates[di].dateStr!==day.iso)continue;
+            cellJobs.push({si:si,di:di,row:row});
+          }
+        }
+        cellJobs.sort(function(a,b){return (a.row.startMin||0)-(b.row.startMin||0);});
+
+        // 三個時段：上午 / 下午 / 夜間
+        var SLOTS=[
+          {label:'☀️',isBoba:false,from:0,to:780},
+          {label:'🫖',isBoba:true,from:780,to:1320},
+          {label:'🌙',isBoba:false,from:1320,to:1440}
+        ];
+        SLOTS.forEach(function(slot,sIdx){
+          var sm=function(j){return j.row.startMin||0;};
+          var slotJobs=cellJobs.filter(function(j){return sm(j)>=slot.from&&sm(j)<slot.to;});
+          var slotDiv=document.createElement('div');
+          slotDiv.style.cssText='border-bottom:'+(sIdx<2?'1px solid rgba(0,0,0,0.07)':'none')+';min-height:28px;padding:2px 4px;';
+          if(slotJobs.length){
+            var lbl=document.createElement('div');
+            lbl.style.cssText='line-height:1;margin-bottom:2px;user-select:none;display:flex;align-items:center;gap:2px;';
+            var icon=document.createElement('span');
+            icon.style.cssText='font-size:14px;flex-shrink:0;';icon.textContent=slot.label;
+            lbl.appendChild(icon);slotDiv.appendChild(lbl);
+          }
+          slotJobs.forEach(function(jj){
+            var key=jj.si+'_'+jj.di;
+            var chg=_adjChanges[key];
+            var isChg=!!chg;
+            var jobDiv=document.createElement('div');
+            jobDiv.className='wv-job';
+            jobDiv.draggable=!jj.row.fixed;
+            jobDiv.style.cursor='pointer';
+            jobDiv.style.background=tc.bg;jobDiv.style.borderLeftColor=tc.border;jobDiv.style.color=tc.text;
+            jobDiv.style.position='relative';
+            if(isChg)jobDiv.style.boxShadow='0 0 0 2px var(--accent)';
+
+            // 變更 Tag
+            if(isChg){
+              var dc=chg.newDateStr!==chg.oldDateStr;
+              var dtc=chg.newTech!==chg.oldTech;
+              var tagEl=document.createElement('span');
+              tagEl.style.cssText='position:absolute;top:-7px;right:2px;font-size:9px;font-weight:500;padding:1px 4px;border-radius:3px;pointer-events:none;z-index:2;line-height:1.4;';
+              if(dc&&dtc){tagEl.style.background='#fef3c7';tagEl.style.color='#92400e';tagEl.textContent='日+人';}
+              else if(dc){tagEl.style.background='#fee2e2';tagEl.style.color='#991b1b';tagEl.textContent='日期';}
+              else{tagEl.style.background='#dcfce7';tagEl.style.color='#14532d';tagEl.textContent='防治師';}
+              jobDiv.appendChild(tagEl);
+            }
+            var nm=document.createElement('div');nm.className='wv-job-name';
+            nm.textContent=(jj.row.fixed?'🔒 ':'')+jj.row.name;
+            nm.title=jj.row.name;
+            var tm=document.createElement('div');tm.className='wv-job-time';
+            tm.textContent=minToStr(jj.row.startMin||0)+'–'+minToStr((jj.row.startMin||0)+(jj.row.duration||30));
+            jobDiv.appendChild(nm);jobDiv.appendChild(tm);
+
+            // 互動
+            if(!jj.row.fixed){
+              (function(xsi,xdi,xDiv){
+                xDiv.addEventListener('dragstart',function(e){
+                  _adjDragSi=xsi;_adjDragDi=xdi;
+                  e.dataTransfer.setData('adj','1');
+                  e.dataTransfer.effectAllowed='move';
+                  setTimeout(function(){xDiv.classList.add('wv-dragging');},0);
+                });
+                xDiv.addEventListener('dragend',function(){xDiv.classList.remove('wv-dragging');});
+                xDiv.addEventListener('click',function(e){e.stopPropagation();_openAdjPop(xsi,xdi,e,true);});
+              })(jj.si,jj.di,jobDiv);
+            } else {
+              (function(xsi,xdi,xDiv){
+                xDiv.addEventListener('click',function(e){e.stopPropagation();_openAdjPop(xsi,xdi,e,false);});
+              })(jj.si,jj.di,jobDiv);
+            }
+            slotDiv.appendChild(jobDiv);
+          });
+          td.appendChild(slotDiv);
+        });
+
+        // Drop zone
+        (function(xTd){
+          xTd.addEventListener('dragover',function(e){
+            if(_adjDragSi===null)return;
+            e.preventDefault();
+            document.querySelectorAll('.wv-cell.wv-drag-over').forEach(function(c){c.classList.remove('wv-drag-over');});
+            xTd.classList.add('wv-drag-over');
+          });
+          xTd.addEventListener('dragleave',function(e){if(!xTd.contains(e.relatedTarget))xTd.classList.remove('wv-drag-over');});
+          xTd.addEventListener('drop',function(e){
+            e.preventDefault();
+            document.querySelectorAll('.wv-cell.wv-drag-over').forEach(function(c){c.classList.remove('wv-drag-over');});
+            if(_adjDragSi===null)return;
+            var si=_adjDragSi;var di=_adjDragDi;
+            var newIso=xTd.dataset.iso;var newTech=xTd.dataset.tech;
+            _applyChange(si,di,newIso,newTech);
+            _adjDragSi=null;_adjDragDi=null;
+          });
+        })(td);
+
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);content.appendChild(table);
+  });
+}
+
+// ════════════════════════════════════════════════
+// 變更套用 + 比對原始
+// ════════════════════════════════════════════════
+function _applyChange(si,di,newIso,newTech){
+  var row=schedule[si];if(!row||!row.dates||!row.dates[di])return;
+  var origRow=_adjSnap[si];
+  var origDateStr=origRow&&origRow.dates&&origRow.dates[di]?origRow.dates[di].dateStr:row.dates[di].dateStr;
+  var origTech=origRow?origRow.technician:row.technician;
+
+  if(newIso){
+    row.dates[di].dateStr=newIso;
+    row.dates[di].date=new Date(newIso+'T00:00:00');
+  }
+  if(newTech){
+    row.technician=newTech;
+    row.color=getTechColor(newTech);
+  }
+  var key=si+'_'+di;
+  var curDate=row.dates[di].dateStr;
+  var curTech=row.technician;
+  if(curDate===origDateStr&&curTech===origTech){
+    delete _adjChanges[key];
+  } else {
+    _adjChanges[key]={si:si,di:di,name:row.name,
+      oldDateStr:origDateStr,newDateStr:curDate,
+      oldTech:origTech,newTech:curTech};
+  }
+  _renderAll();
+}
+
+// ════════════════════════════════════════════════
+// 點擊案場：彈窗換日 + 換防治師（多選）
+// ════════════════════════════════════════════════
+function _openAdjPop(si,di,e,allowDate){
+  var row=schedule[si];
+  var origRow=_adjSnap[si];
+  var origTech=origRow?origRow.technician:row.technician;
+  var origDateStr=origRow&&origRow.dates&&origRow.dates[di]?origRow.dates[di].dateStr:row.dates[di].dateStr;
+  var popup=document.getElementById('adj-tech-popup');
+  popup.innerHTML='';
+
+  // 標題
+  var title=document.createElement('div');
+  title.style.cssText='font-size:11px;font-weight:600;color:var(--text);padding:7px 10px 6px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;';
+  title.title=row.name;title.textContent=row.name;
+  popup.appendChild(title);
+
+  // 換日期
+  if(allowDate){
+    var dateSection=document.createElement('div');
+    dateSection.style.cssText='padding:7px 10px;border-bottom:1px solid var(--border);';
+    var dateLabel=document.createElement('div');
+    dateLabel.style.cssText='font-size:10px;color:var(--text3);margin-bottom:5px;letter-spacing:.04em;';
+    dateLabel.textContent='📅 更換日期';
+    var dateRow=document.createElement('div');
+    dateRow.style.cssText='display:flex;gap:6px;align-items:center;';
+    var dateInput=document.createElement('input');
+    dateInput.type='date';
+    dateInput.value=row.dates[di].dateStr||origDateStr;
+    dateInput.style.cssText='flex:1;border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12px;color:var(--text);outline:none;';
+    var dateBtn=document.createElement('button');
+    dateBtn.textContent='確認';
+    dateBtn.style.cssText='background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;';
+    dateBtn.addEventListener('click',function(evt){
+      evt.stopPropagation();
+      var newIso=dateInput.value;
+      if(!newIso)return;
+      _applyChange(si,di,newIso,null);
+      popup.style.display='none';
+    });
+    dateRow.appendChild(dateInput);dateRow.appendChild(dateBtn);
+    dateSection.appendChild(dateLabel);dateSection.appendChild(dateRow);
+    popup.appendChild(dateSection);
+  } else {
+    var fixedNote=document.createElement('div');
+    fixedNote.style.cssText='padding:6px 10px;font-size:10px;color:#6b7280;border-bottom:1px solid var(--border);';
+    fixedNote.textContent='🔒 固定日期客戶，僅可更換防治師';
+    popup.appendChild(fixedNote);
+  }
+
+  // 換防治師（多選，勾選即套用）
+  var techLabel=document.createElement('div');
+  techLabel.style.cssText='font-size:10px;color:var(--text3);padding:6px 10px 3px;letter-spacing:.04em;';
+  techLabel.textContent='👤 防治師（可複選，勾選即生效）';
+  popup.appendChild(techLabel);
+
+  var currTechStr=row.technician||'';
+  var selectedTechs=currTechStr.split(',').map(function(t){return t.trim();}).filter(Boolean);
+  var checkboxMap={};
+
+  function _applyTechSelection(){
+    var newTechs=TECH_ORDER.filter(function(t){return checkboxMap[t]&&checkboxMap[t].selected;});
+    if(!newTechs.length)return;// 至少留一位
+    var newTechStr=newTechs.join(',');
+    _applyChange(si,di,null,newTechStr);
+  }
+
+  TECH_ORDER.forEach(function(tn){
+    var tc=TECH_COLORS[tn]||DEF_COLOR;
+    var isSelected=selectedTechs.indexOf(tn)>=0;
+    var opt=document.createElement('div');
+    opt.style.cssText='display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--text);user-select:none;'+(isSelected?'background:var(--surface2);font-weight:600;':'');
+    var chkBox=document.createElement('span');
+    chkBox.style.cssText='width:14px;height:14px;border-radius:3px;border:1.5px solid '+(isSelected?tc.border:'#d1d5db')+';background:'+(isSelected?tc.bg:'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;transition:all .1s;';
+    chkBox.textContent=isSelected?'✓':'';
+    var dot=document.createElement('span');
+    dot.style.cssText='width:8px;height:8px;border-radius:50%;background:'+tc.border+';display:inline-block;flex-shrink:0;';
+    var lbl=document.createElement('span');lbl.textContent=tn;
+    opt.appendChild(chkBox);opt.appendChild(dot);opt.appendChild(lbl);
+    checkboxMap[tn]={el:opt,chk:chkBox,selected:isSelected,tc:tc};
+    opt.addEventListener('click',function(evt){
+      evt.stopPropagation();
+      var st=checkboxMap[tn];
+      var currentSelected=TECH_ORDER.filter(function(t){return checkboxMap[t]&&checkboxMap[t].selected;});
+      if(st.selected&&currentSelected.length<=1)return;
+      st.selected=!st.selected;
+      if(st.selected){
+        st.chk.style.borderColor=st.tc.border;st.chk.style.background=st.tc.bg;st.chk.textContent='✓';
+        st.el.style.background='var(--surface2)';st.el.style.fontWeight='600';
+      } else {
+        st.chk.style.borderColor='#d1d5db';st.chk.style.background='transparent';st.chk.textContent='';
+        st.el.style.background='';st.el.style.fontWeight='';
+      }
+      _applyTechSelection();
+      // 不關 popup，讓使用者繼續勾
+      // 但要更新 selectedTechs 比對
+      selectedTechs=TECH_ORDER.filter(function(t){return checkboxMap[t]&&checkboxMap[t].selected;});
+    });
+    popup.appendChild(opt);
+  });
+
+  popup.style.display='block';
+  var left=Math.min(e.clientX,window.innerWidth-260);
+  var top=e.clientY+8;
+  if(top+440>window.innerHeight)top=Math.max(8,e.clientY-460);
+  popup.style.left=left+'px';popup.style.top=top+'px';
+}
+
+document.addEventListener('click',function(e){
+  var p=document.getElementById('adj-tech-popup');
+  if(p&&p.style.display==='block'&&!p.contains(e.target))p.style.display='none';
+});
+
+// ════════════════════════════════════════════════
+// 變更清單側欄
+// ════════════════════════════════════════════════
+function _renderAdjPanel(){
+  var list=document.getElementById('adj-change-list');
+  var keys=Object.keys(_adjChanges);
+  if(!keys.length){
+    list.innerHTML='<div style="padding:24px 12px;font-size:12px;color:var(--text3);text-align:center;line-height:1.7;">尚無變更<br><span style="font-size:10px;">拖曳或點擊案場以調整</span></div>';
+  } else {
+    var html='';
+    keys.forEach(function(k){
+      var c=_adjChanges[k];
+      var dc=c.newDateStr!==c.oldDateStr;
+      var tc=c.newTech!==c.oldTech;
+      html+='<div class="adj-change-item">';
+      html+='<div class="adj-change-name" title="'+c.name+'">'+c.name+'</div>';
+      if(dc&&tc){
+        html+='<span class="adj-tag adj-tag-both">日+人</span>';
+      } else if(dc){
+        html+='<span class="adj-tag adj-tag-date">日期</span>';
+      } else {
+        html+='<span class="adj-tag adj-tag-tech">防治師</span>';
+      }
+      if(dc){
+        html+='<div class="adj-diff"><span class="old">'+c.oldDateStr+'</span> → <span class="new">'+c.newDateStr+'</span></div>';
+      }
+      if(tc){
+        html+='<div class="adj-diff"><span class="old">'+c.oldTech+'</span> → <span class="new">'+c.newTech+'</span></div>';
+      }
+      html+='</div>';
+    });
+    list.innerHTML=html;
+  }
+}
+
+function _updateChips(){
+  var n=Object.keys(_adjChanges).length;
+  var jobs=schedule.reduce(function(a,r){return a+(excluded.has(r.name)?0:(r.dates?r.dates.length:0));},0);
+  document.getElementById('s-jobs').textContent=_loaded?jobs:'—';
+  var chip=document.getElementById('chip-changed');
+  if(n>0){
+    chip.style.display='';
+    document.getElementById('s-changed').textContent=n;
+  } else {
+    chip.style.display='none';
+  }
+  var has=n>0;
+  ['btn-save','btn-save-2','btn-reset','btn-reset-2'].forEach(function(id){
+    var b=document.getElementById(id);if(b)b.disabled=!has;
+  });
+}
+
+// ════════════════════════════════════════════════
+// 啟動
+// ════════════════════════════════════════════════
+window.addEventListener('load',function(){
+  initMonth();
+  // 等 Firebase 初始化完成
+  var tryStart=function(retries){
+    if(window._fb&&window._fb.ready){reloadSchedule();return;}
+    if(retries<=0){_showLoadFail('Firebase 初始化逾時。請重新整理頁面。');return;}
+    setTimeout(function(){tryStart(retries-1);},200);
+  };
+  tryStart(25); // 5 秒
+});
+</script>
+</body>
+</html>
