@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手動新增通報單 — 填寫範例</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    font-weight: 300;
+    background: #f0f4f8;
+    min-height: 100vh;
+    padding: 36px 24px 60px;
+    color: #1e293b;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 900px;
+    margin: 0 auto 24px;
+  }
+  .page-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    font-weight: 400;
+    color: #1e293b;
+  }
+  .page-title .plus {
+    font-size: 26px;
+    color: #2563eb;
+    font-weight: 300;
+  }
+  .btn-back {
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 300;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ── Example badge ── */
+  .example-badge {
+    max-width: 900px;
+    margin: 0 auto 20px;
+    background: #fef9c3;
+    border: 1.5px dashed #fde047;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-size: 13px;
+    color: #713f12;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+    max-width: 900px;
+    margin: 0 auto 24px;
+    overflow: hidden;
+  }
+
+  /* Step header */
+  .step-header {
+    background: #2563eb;
+    color: #fff;
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .step-header.step2 {
+    background: #0891b2;
+  }
+
+  .card-body {
+    padding: 28px 28px 32px;
+  }
+
+  /* ── Field grid ── */
+  .field-grid {
+    display: grid;
+    gap: 20px 24px;
+  }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-1 { grid-template-columns: 1fr; }
+  .col-span-2 { grid-column: span 2; }
+  .col-span-4 { grid-column: span 4; }
+
+  /* ── Field ── */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 400;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .required {
+    color: #ef4444;
+    font-size: 13px;
+  }
+  .field-label .ai-tag {
+    font-size: 11px;
+    color: #ef4444;
+    margin-left: 2px;
+  }
+
+  /* Input-like display */
+  .field-val {
+    border: 1.5px solid #93c5fd;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 300;
+    color: #1e293b;
+    background: #f0f9ff;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  /* empty / placeholder style */
+  .field-val.empty {
+    color: #94a3b8;
+    background: #f9fafb;
+    border-color: #e2e8f0;
+    font-style: italic;
+    font-size: 13px;
+  }
+  /* highlighted filled value */
+  .field-val.filled {
+    border-color: #93c5fd;
+    background: #f0f9ff;
+  }
+  /* "待確認" style */
+  .field-val.pending {
+    border-color: #fde68a;
+    background: #fffdf0;
+    color: #92400e;
+  }
+
+  /* Annotation bubble */
+  .anno {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: #92400e;
+    margin-top: 4px;
+    width: fit-content;
+  }
+  .anno.blue {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1e40af;
+  }
+  .anno.green {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #15803d;
+  }
+  .anno.red {
+    background: #fff5f5;
+    border-color: #fca5a5;
+    color: #b91c1c;
+  }
+
+  /* Checkbox group */
+  .checkbox-group {
+    border: 1.5px solid #93c5fd;
+    border-radius: 8px;
+    background: #f0f9ff;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+  }
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 300;
+    color: #374151;
+  }
+  .checkbox-item input[type=checkbox] {
+    width: 16px; height: 16px;
+    accent-color: #2563eb;
+    cursor: default;
+  }
+
+  /* Textarea */
+  .field-textarea {
+    border: 1.5px solid #93c5fd;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 300;
+    color: #1e293b;
+    background: #f0f9ff;
+    min-height: 72px;
+    line-height: 1.75;
+  }
+
+  /* Photo upload zone */
+  .photo-zone {
+    border: 1.5px dashed #93c5fd;
+    border-radius: 10px;
+    background: #f0f9ff;
+    padding: 20px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 13px;
+  }
+  .photo-zone .cam { font-size: 24px; margin-bottom: 6px; }
+
+  /* Select dropdown display */
+  .field-select {
+    border: 1.5px solid #93c5fd;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 300;
+    color: #1e293b;
+    background: #f0f9ff;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .field-select .caret { color: #94a3b8; font-size: 12px; }
+
+  /* Step 2 fields */
+  .radio-option {
+    border: 1.5px solid #93c5fd;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 300;
+    background: #f0f9ff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1e293b;
+  }
+  .radio-option input[type=radio] {
+    width: 16px; height: 16px;
+    accent-color: #2563eb;
+  }
+
+  .divider { border: none; border-top: 1px solid #f1f5f9; margin: 20px 0; }
+
+  /* Submit button display */
+  .btn-submit {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 32px;
+    font-size: 15px;
+    font-weight: 400;
+    cursor: default;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Source message box ── */
+  .source-box {
+    max-width: 900px;
+    margin: 0 auto 28px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .source-box .src-title {
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .source-box .src-body {
+    font-size: 14px;
+    font-weight: 300;
+    color: #475569;
+    line-height: 2;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 14px 18px;
+    border: 1px solid #e2e8f0;
+  }
+</style>
+</head>
+<body>
+
+<!-- Page header -->
+<div class="page-header">
+  <div class="page-title">
+    <span class="plus">＋</span> 手動新增通報單
+    <span style="font-size:13px;color:#94a3b8;font-weight:300;margin-left:8px;">填寫範例</span>
+  </div>
+  <div class="btn-back">📋 返回總表</div>
+</div>
+
+<!-- Example notice -->
+<div class="example-badge">
+  💡 以下為填寫範例，藍底欄位為對應填入的內容，灰底「（留白）」為未提供資訊時留空的欄位
+</div>
+
+<!-- 原始客戶訊息 -->
+<div class="source-box">
+  <div class="src-title">📩 原始客戶訊息</div>
+  <div class="src-body">
+    ※店鋪名：台北林森店<br>
+    ※聯絡日：4/29<br>
+    ※發生日：4/29<br>
+    ※通報事項：員工休息室突然出現很多蛾蚋，再麻煩請協助確認，謝謝。
+  </div>
+</div>
+
+<!-- ══ 第一步：填寫通報內容 ══ -->
+<div class="card">
+  <div class="step-header">📋 第一步：填寫通報內容</div>
+  <div class="card-body">
+
+    <!-- Row 1: 客戶名稱 / 大類別 / 通報種類 / 通報主旨 -->
+    <div class="field-grid grid-4" style="margin-bottom:20px;">
+
+      <div class="field" style="grid-column:span 1;">
+        <div class="field-label">客戶名稱 <span class="required">*</span></div>
+        <div class="field-val filled">台北林森店</div>
+        <div class="anno green">✓ 搜尋客戶名稱後選取</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">大類別 <span class="required">*</span></div>
+        <div class="field-select">
+          <span style="color:#94a3b8;">害物相關</span>
+          <span class="caret">▼</span>
+        </div>
+        <div class="anno">照客戶訊息選擇</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">通報種類</div>
+        <div class="field-select">
+          <span style="color:#94a3b8;">機動通報</span>
+          <span class="caret">▼</span>
+        </div>
+        <div class="anno">照客戶訊息選擇</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">通報主旨</div>
+        <div class="field-val filled">員工休息室出現蛾蚋</div>
+        <div class="anno blue">↑ 簡短摘要通報事項</div>
+      </div>
+
+    </div>
+
+    <hr class="divider">
+
+    <!-- Row 2: 發生日期 / 發生時間 / 發生地點 / 目擊者 -->
+    <div class="field-grid grid-4" style="margin-bottom:20px;">
+
+      <div class="field">
+        <div class="field-label">發生日期</div>
+        <div class="field-val filled">2026/04/29</div>
+        <div class="anno green">✓ 來自「發生日」</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">發生時間</div>
+        <div class="field-val filled">12:04</div>
+        <div class="anno green">✓ 來自聯絡日時間</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">發生地點</div>
+        <div class="field-val filled">員工休息室</div>
+        <div class="anno green">✓ 來自通報事項</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">目擊者 / 回報人</div>
+        <div class="field-val filled">葉哲成</div>
+        <div class="anno green">✓ 回報人</div>
+      </div>
+
+    </div>
+
+    <hr class="divider">
+
+    <!-- Row 3: 目擊害物 / 數量 / AI等級 -->
+    <div class="field-grid" style="grid-template-columns: 1fr 120px 200px; margin-bottom:20px; gap:20px 24px;">
+
+      <div class="field">
+        <div class="field-label">目擊害物（可複選）<span class="required">*</span></div>
+        <div class="checkbox-group">
+          <div class="checkbox-item"><input type="checkbox"> 老鼠</div>
+          <div class="checkbox-item"><input type="checkbox" checked> 飛蟲 ✓</div>
+          <div class="checkbox-item"><input type="checkbox"> 德國蟑螂/棕帶蟑螂</div>
+          <div class="checkbox-item"><input type="checkbox"> 其他害蟲</div>
+          <div class="checkbox-item"><input type="checkbox"> 其他蟑螂</div>
+        </div>
+        <div class="anno green">✓ 勾選「飛蟲」（蛾蚋屬飛蟲類）</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">數量</div>
+        <div class="field-val empty">（留白）</div>
+        <div class="anno">未提供，留空即可</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">AI 判定等級 <span class="ai-tag">（可手動指定）</span></div>
+        <div class="field-select">
+          <span style="color:#ef4444;font-size:13px;">讓系統背景計算（預設）</span>
+          <span class="caret">▼</span>
+        </div>
+        <div class="anno blue">保持預設即可</div>
+      </div>
+
+    </div>
+
+    <hr class="divider">
+
+    <!-- 狀況描述 -->
+    <div class="field" style="margin-bottom:20px;">
+      <div class="field-label">狀況描述</div>
+      <div class="field-textarea">
+        【客戶原始訊息】<br>
+        員工休息室突然出現很多蛾蚋，再麻煩請協助確認，謝謝。<br><br>
+        聯絡日：4/29　　發生日：4/29
+      </div>
+      <div class="anno green">✓ 將客戶訊息複製貼上於此</div>
+    </div>
+
+    <!-- 當下採取措施 -->
+    <div class="field" style="margin-bottom:20px;">
+      <div class="field-label">當下採取措施</div>
+      <div class="field-val empty">（留白）</div>
+      <div class="anno">未提供，留空即可</div>
+    </div>
+
+    <!-- 照片 -->
+    <div class="field">
+      <div class="field-label">📷 附照片？（選填，可複選多張）</div>
+      <div class="photo-zone">
+        <div class="cam">📷</div>
+        點擊此處選擇照片
+        <div style="margin-top:8px;font-size:12px;color:#cbd5e1;">客戶未附照片，此欄略過</div>
+      </div>
+      <div class="anno" style="margin-top:6px;">客戶有附照片才上傳，無則略過</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ 第二步：內部派工設定 ══ -->
+<div class="card">
+  <div class="step-header step2">⚙️ 第二步：內部派工設定（可稍後再填）</div>
+  <div class="card-body">
+
+    <div class="field" style="margin-bottom:20px;">
+      <div class="field-label">派工方式</div>
+      <div class="radio-option">
+        <input type="radio" checked readonly> 紀錄即可（暫不派工）
+      </div>
+      <div class="anno green">✓ 選擇此項</div>
+    </div>
+
+    <div class="field" style="margin-bottom:24px;">
+      <div class="field-label">訊息建立者</div>
+      <div class="field-val filled">Hubert</div>
+      <div class="anno green">✓ 選擇訊息建立者</div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-start;">
+      <div>
+        <button class="btn-submit">僅建單（狀態：通報）</button>
+        <div class="anno green" style="margin-top:8px;">✓ 點選此按鈕完成建單</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
