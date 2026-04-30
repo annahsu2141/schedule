@@ -213,6 +213,10 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 .avail-tech-tag:hover{filter:brightness(1.1);}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+#wv-content ::-webkit-scrollbar{height:10px;}
+#wv-content ::-webkit-scrollbar-track{background:var(--surface2);border-radius:5px;}
+#wv-content ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:5px;border:2px solid var(--surface2);}
+#wv-content ::-webkit-scrollbar-thumb:hover{background:#64748b;}
 .month-picker{display:flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;}
 .month-picker label{font-size:11px;color:var(--text2);}
 .month-picker input[type=month]{background:none;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;width:130px;color-scheme:light;cursor:pointer;}
@@ -478,22 +482,26 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 <div class="dv-header" id="wv-header" style="gap:6px;flex-wrap:wrap;">
 <div id="wv-week-btns" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
 <div style="margin-left:auto;font-size:11px;color:var(--text3)" id="wv-range-label"></div>
-<button class="btn btn-ghost" id="wv-adj-btn" onclick="enterAdjMode()" style="font-size:11px;padding:4px 10px;margin-left:6px;">✏️ 調整模式</button>
+<button class="btn btn-ghost" id="wv-timeline-btn" onclick="toggleTimelineMode()" style="font-size:11px;padding:4px 10px;margin-left:6px;" title="切換時間軸視圖">⊞ 時間軸</button>
+
 </div>
 <div id="wv-adj-banner" style="display:none;align-items:center;gap:8px;padding:6px 14px;background:rgba(217,119,6,.08);border-bottom:1px solid rgba(217,119,6,.3);font-size:12px;color:var(--orange);flex-shrink:0;">
 <span style="width:7px;height:7px;border-radius:50%;background:var(--orange);display:inline-block;animation:_adjPulse 1.4s infinite;flex-shrink:0;"></span>
 <span>調整模式 — 整月顯示，可跨週拖曳。<b style="font-weight:500;">紅框 = 已異動</b>。套用後才會正式存入排班</span>
 <span style="margin-left:auto;font-size:11px;font-weight:500;" id="wv-adj-cnt">尚無變更</span>
 </div>
-<div id="wv-draft-banner" style="display:none;align-items:center;gap:8px;padding:8px 14px;background:rgba(124,58,237,.07);border-bottom:1px solid rgba(124,58,237,.25);font-size:12px;color:#5b21b6;flex-shrink:0;flex-wrap:wrap;">
-<span style="width:7px;height:7px;border-radius:50%;background:#7c3aed;display:inline-block;flex-shrink:0;"></span>
-<span style="font-weight:500;">主管有一份未套用的草稿</span>
-<span id="wv-draft-savedAt" style="color:#7c3aed;opacity:.7;font-size:11px;"></span>
-<div id="wv-draft-list" style="width:100%;padding:4px 0 2px 15px;font-size:11px;color:#4c1d95;line-height:1.9;"></div>
-<div style="display:flex;gap:6px;margin-left:auto;">
-<button class="btn" onclick="applyDraft()" style="font-size:11px;background:rgba(124,58,237,.12);border-color:#7c3aed;color:#5b21b6;padding:4px 12px;">✓ 套用草稿</button>
-<button class="btn btn-ghost" onclick="discardDraft()" style="font-size:11px;padding:4px 10px;">✕ 捨棄草稿</button>
+<div id="wv-draft-banner" style="display:none;padding:8px 14px;background:rgba(124,58,237,.07);border-bottom:1px solid rgba(124,58,237,.25);font-size:12px;color:#5b21b6;flex-shrink:0;max-height:120px;overflow:hidden;transition:max-height .25s ease;">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+  <span style="width:7px;height:7px;border-radius:50%;background:#7c3aed;display:inline-block;flex-shrink:0;"></span>
+  <span style="font-weight:500;">主管有一份未套用的草稿</span>
+  <span id="wv-draft-savedAt" style="color:#7c3aed;opacity:.7;font-size:11px;"></span>
+  <span id="wv-draft-toggle" onclick="toggleDraftList()" style="cursor:pointer;font-size:11px;color:#7c3aed;text-decoration:underline;margin-left:4px;">▾ 展開明細</span>
+  <div style="display:flex;gap:6px;margin-left:auto;">
+    <button class="btn" onclick="applyDraft()" style="font-size:11px;background:rgba(124,58,237,.12);border-color:#7c3aed;color:#5b21b6;padding:4px 12px;">✓ 套用草稿</button>
+    <button class="btn btn-ghost" onclick="discardDraft()" style="font-size:11px;padding:4px 10px;">✕ 捨棄草稿</button>
+  </div>
 </div>
+<div id="wv-draft-list" style="padding:4px 0 2px 15px;font-size:11px;color:#4c1d95;line-height:1.9;max-height:200px;overflow-y:auto;display:none;"></div>
 </div>
 <div style="flex:1;display:flex;overflow:hidden;">
 <div style="flex:1;overflow:auto;padding:0;" id="wv-scroll">
@@ -2810,6 +2818,507 @@ weekDays=[];
 if(weekDays.length)weeks.push(weekDays.slice());
 return weeks;
 }
+
+// ════════════════════════════════════════════════
+// 時間軸視圖
+// ════════════════════════════════════════════════
+var _wvTimeline=false;
+var _tlDay=null;// 目前時間軸顯示的日期 ISO
+
+function toggleTimelineMode(){
+  _wvTimeline=!_wvTimeline;
+  var btn=document.getElementById('wv-timeline-btn');
+  if(_wvTimeline){
+    if(btn){btn.textContent='☰ 清單';btn.style.background='rgba(37,99,168,.1)';btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
+    // 預設顯示本週第一天
+    var weeks=getMonthWeeks();
+    if(weeks.length&&weeks[wvCurrentWeek]&&weeks[wvCurrentWeek].length){
+      _tlDay=weeks[wvCurrentWeek][0].iso;
+    }
+    renderTimelineView();
+  } else {
+    if(btn){btn.textContent='⊞ 時間軸';btn.style.background='';btn.style.borderColor='';btn.style.color='';}
+    renderWeekView();
+  }
+}
+
+function renderTimelineView(){
+  var contentEl=document.getElementById('wv-content');
+  if(!contentEl)return;
+  contentEl.innerHTML='';
+
+  var weeks=getMonthWeeks();
+  if(!weeks.length||!schedule.length){
+    contentEl.innerHTML='<div class="import-hint"><div class="icon">📆</div><h2>匯入排班後可查看時間軸</h2></div>';
+    return;
+  }
+  var wk=weeks[wvCurrentWeek]||weeks[0];
+  var cs=detectConflicts();
+  var todayIso=toISO(new Date());
+
+  // ── 非線性時間軸設定 ──
+  var SEGS=[
+    {s:420, e:720,  px:1.5, gray:false},
+    {s:720, e:780,  px:0.4, gray:true },
+    {s:780, e:1050, px:1.5, gray:false},
+    {s:1050,e:1260, px:0.35,gray:true },
+    {s:1260,e:1440, px:1.3, gray:false},
+  ];
+  var segY=[0];
+  for(var si2=0;si2<SEGS.length;si2++)segY.push(segY[si2]+Math.round((SEGS[si2].e-SEGS[si2].s)*SEGS[si2].px));
+  var HDR_H=68;// 兩層表頭高度（36+32）
+  var totalH=segY[SEGS.length];
+
+  function minToY(min){
+    for(var i=0;i<SEGS.length;i++){
+      if(min<=SEGS[i].e){
+        var clamped=Math.max(min,SEGS[i].s);
+        return segY[i]+Math.round((clamped-SEGS[i].s)*SEGS[i].px);
+      }
+    }
+    return totalH;
+  }
+
+  var COL_W=90;
+  var LABEL_W=52;// 左側時間軸寬度
+  var DAY_SEP=6;// 天分隔寬度
+  // 右側主內容寬度（不含時間軸）
+  var contentW=wk.length*TECH_ORDER.length*COL_W+wk.length*DAY_SEP;
+
+  // 收集任務
+  var allItems=[];
+  for(var si=0;si<schedule.length;si++){
+    var row=schedule[si];
+    if(excluded.has(row.name))continue;
+    for(var di=0;di<row.dates.length;di++){
+      var ds=row.dates[di].dateStr;
+      if(!wk.find(function(d){return d.iso===ds;}))continue;
+      var techs=(row.technician||'').split(',').map(function(t){return t.trim();}).filter(Boolean);
+      techs.forEach(function(tn){
+        allItems.push({si:si,di:di,row:row,tech:tn,dateStr:ds,isConflict:!!cs[si+'|'+di]});
+      });
+    }
+  }
+
+  // ════════════════════════════════════════════════
+  // 外層架構：凍結窗格 4 區塊
+  // ┌──────────┬───────────────────────────┐
+  // │  corner  │   日期/防治師表頭（hdr）     │← 不捲動（JS sync X）
+  // ├──────────┼───────────────────────────┤
+  // │ 時間軸   │      主內容 grid          │← 主捲動區（mainScroll）
+  // │（timeAx）│                           │
+  // └──────────┴───────────────────────────┘
+  // ════════════════════════════════════════════════
+
+  var outerWrap=document.createElement('div');
+  outerWrap.style.cssText='display:flex;flex-direction:column;height:100%;overflow:hidden;';
+
+  // ── 頂部鏡像捲軸 ──
+  var mirrorBar=document.createElement('div');
+  mirrorBar.style.cssText='overflow-x:auto;overflow-y:hidden;height:14px;flex-shrink:0;border-bottom:1px solid var(--border);margin-left:'+LABEL_W+'px;';
+  var mirrorInner=document.createElement('div');
+  mirrorInner.style.cssText='width:'+contentW+'px;height:1px;';
+  mirrorBar.appendChild(mirrorInner);
+
+  // ── 主體：左側固定 + 右側捲動 ──
+  var mainArea=document.createElement('div');
+  mainArea.style.cssText='display:flex;flex:1;overflow:hidden;min-height:0;';
+
+  // ── 左側欄（時間軸 + corner）──
+  var leftCol=document.createElement('div');
+  leftCol.style.cssText='width:'+LABEL_W+'px;flex-shrink:0;display:flex;flex-direction:column;z-index:20;';
+
+  // corner（左上角）
+  var corner=document.createElement('div');
+  corner.style.cssText='height:'+HDR_H+'px;flex-shrink:0;background:var(--surface);border-right:2px solid var(--border);border-bottom:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text3);letter-spacing:.05em;';
+  corner.textContent='時間';
+  leftCol.appendChild(corner);
+
+  // 時間軸捲動容器（overflow:hidden，由JS同步Y）
+  var timeAxWrap=document.createElement('div');
+  timeAxWrap.style.cssText='flex:1;overflow:hidden;position:relative;background:var(--surface);border-right:2px solid var(--border);';
+  var timeAxInner=document.createElement('div');
+  timeAxInner.style.cssText='position:absolute;top:0;left:0;width:'+LABEL_W+'px;height:'+(totalH+20)+'px;';
+
+  // 時間標籤（整點 + 特殊）
+  SEGS.forEach(function(seg){
+    for(var m=seg.s;m<=seg.e;m+=30){
+      if(m%60===0){
+        var y=minToY(m);
+        var tlbl=document.createElement('div');
+        tlbl.style.cssText='position:absolute;right:6px;top:'+(y-9)+'px;font-size:12px;font-weight:600;color:#374151;pointer-events:none;white-space:nowrap;';
+        tlbl.textContent=String(Math.floor(m/60)).padStart(2,'0')+':00';
+        timeAxInner.appendChild(tlbl);
+      }
+    }
+  });
+  // 08:30 標籤
+  var startLblAx=document.createElement('div');
+  startLblAx.style.cssText='position:absolute;right:4px;top:'+(minToY(510)-11)+'px;font-size:10px;font-weight:700;color:#ef4444;pointer-events:none;white-space:nowrap;';
+  startLblAx.textContent='08:30↑';
+  timeAxInner.appendChild(startLblAx);
+  // 午休標籤
+  var lunchLblAx=document.createElement('div');
+  lunchLblAx.style.cssText='position:absolute;right:4px;top:'+(minToY(720)+2)+'px;font-size:9px;color:#9ca3af;font-style:italic;pointer-events:none;white-space:nowrap;writing-mode:vertical-rl;';
+  lunchLblAx.textContent='午休';
+  timeAxInner.appendChild(lunchLblAx);
+
+  timeAxWrap.appendChild(timeAxInner);
+  leftCol.appendChild(timeAxWrap);
+
+  // ── 右側區域（表頭 + 主捲動）──
+  var rightArea=document.createElement('div');
+  rightArea.style.cssText='flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0;';
+
+  // 表頭容器（overflow:hidden，由JS同步X）
+  var hdrWrap=document.createElement('div');
+  hdrWrap.style.cssText='overflow:hidden;height:'+HDR_H+'px;flex-shrink:0;position:relative;';
+  var hdrInner=document.createElement('div');
+  hdrInner.style.cssText='position:absolute;top:0;left:0;width:'+contentW+'px;';
+
+  // 日期列（36px）
+  var dayHdr=document.createElement('div');
+  dayHdr.style.cssText='display:flex;height:36px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.06);';
+  wk.forEach(function(day,wi){
+    var isToday=day.iso===todayIso;
+    var dayW=TECH_ORDER.length*COL_W+(wi<wk.length-1?DAY_SEP:0);
+    var dow=['日','一','二','三','四','五','六'][day.date.getDay()];
+    var dCell=document.createElement('div');
+    dCell.style.cssText='width:'+dayW+'px;flex-shrink:0;text-align:center;padding:6px 0 5px;font-size:13px;font-weight:700;letter-spacing:.03em;border-right:2px solid var(--border);'+(isToday?'color:var(--accent);background:rgba(37,99,168,.05);':'color:var(--text);');
+    dCell.textContent=(day.date.getMonth()+1)+'/'+(day.date.getDate())+' 週'+dow+(day.isHol?' 🎌':'');
+    dayHdr.appendChild(dCell);
+  });
+
+  // 防治師列（32px）
+  var techHdr=document.createElement('div');
+  techHdr.style.cssText='display:flex;height:32px;background:var(--surface);border-bottom:2px solid var(--border);box-shadow:0 2px 4px rgba(0,0,0,.05);';
+  wk.forEach(function(day,wi){
+    TECH_ORDER.forEach(function(tn,ti){
+      var tc=TECH_COLORS[tn]||DEF_COLOR;
+      var hasJobs=allItems.some(function(it){return it.tech===tn&&it.dateStr===day.iso;});
+      var tCell=document.createElement('div');
+      tCell.style.cssText='width:'+COL_W+'px;flex-shrink:0;text-align:center;font-size:11px;font-weight:700;padding:5px 0;border-right:1px solid '+(ti===TECH_ORDER.length-1?'#bbb':'var(--border)')+';border-left:3px solid '+(hasJobs?tc.border:'#e5e7eb')+';color:'+(hasJobs?tc.border:'var(--text3)')+';background:'+(hasJobs?tc.bg:'var(--surface)')+';';
+      tCell.textContent=tn;
+      techHdr.appendChild(tCell);
+    });
+    if(wi<wk.length-1){
+      var sep=document.createElement('div');
+      sep.style.cssText='width:'+DAY_SEP+'px;flex-shrink:0;background:var(--surface2);border-left:1px solid var(--border);border-right:1px solid var(--border);';
+      techHdr.appendChild(sep);
+    }
+  });
+
+  hdrInner.appendChild(dayHdr);
+  hdrInner.appendChild(techHdr);
+  hdrWrap.appendChild(hdrInner);
+
+  // ── 主捲動區 ──
+  var mainScroll=document.createElement('div');
+  mainScroll.style.cssText='overflow:auto;flex:1;';
+
+  // ── Grid（主內容，X 座標從 0 開始，不含 LABEL_W）──
+  var grid=document.createElement('div');
+  grid.style.cssText='position:relative;width:'+contentW+'px;height:'+(totalH+20)+'px;';
+
+  // 格線與灰色帶
+  SEGS.forEach(function(seg,si3){
+    if(seg.gray){
+      var band=document.createElement('div');
+      var bandY=minToY(seg.s);
+      var bandH=minToY(seg.e)-minToY(seg.s);
+      band.style.cssText='position:absolute;left:0;right:0;top:'+bandY+'px;height:'+bandH+'px;background:rgba(0,0,0,0.04);pointer-events:none;z-index:1;';
+      var bandLbl=document.createElement('div');
+      bandLbl.style.cssText='position:absolute;left:6px;top:'+(bandY+2)+'px;font-size:10px;color:#9ca3af;font-style:italic;z-index:2;';
+      bandLbl.textContent=seg.s===720?'午休 12:00–13:00':'下班後 17:30–21:00';
+      grid.appendChild(band);grid.appendChild(bandLbl);
+    }
+    for(var m=seg.s;m<=seg.e;m+=30){
+      var y=minToY(m);
+      var lineDiv=document.createElement('div');
+      lineDiv.style.cssText='position:absolute;left:0;right:0;top:'+y+'px;height:1px;background:'+(m%60===0?'rgba(0,0,0,.12)':'rgba(0,0,0,.04)')+';pointer-events:none;z-index:1;';
+      grid.appendChild(lineDiv);
+    }
+  });
+
+  // 現在時間線
+  var now2=new Date();var nowMin=now2.getHours()*60+now2.getMinutes();
+  var nowDayIdx2=wk.findIndex(function(d){return d.iso===toISO(now2);});
+  if(nowDayIdx2>=0){
+    var nowY=minToY(nowMin);
+    var nowX=nowDayIdx2*(TECH_ORDER.length*COL_W+DAY_SEP);
+    var nowLine=document.createElement('div');
+    nowLine.style.cssText='position:absolute;left:'+nowX+'px;width:'+(TECH_ORDER.length*COL_W)+'px;top:'+nowY+'px;height:2px;background:#ef4444;z-index:5;pointer-events:none;';
+    grid.appendChild(nowLine);
+  }
+
+  // 08:30 上班紅線
+  var startY=minToY(510);
+  var startLine=document.createElement('div');
+  startLine.style.cssText='position:absolute;left:0;right:0;top:'+startY+'px;height:2px;background:#ef4444;z-index:4;pointer-events:none;opacity:.7;';
+  grid.appendChild(startLine);
+
+  // 每位防治師的下班提醒線
+  wk.forEach(function(day,wi){
+    TECH_ORDER.forEach(function(tn,ti){
+      var techDayItems=allItems.filter(function(it){return it.tech===tn&&it.dateStr===day.iso;});
+      if(!techDayItems.length)return;
+      var earliest=techDayItems.reduce(function(mn,it){return Math.min(mn,it.row.startMin);},9999);
+      if(earliest>=510)return;
+      var offMin=earliest+9*60;
+      var offY=minToY(offMin);
+      var offX=wi*(TECH_ORDER.length*COL_W+DAY_SEP)+ti*COL_W;
+      var offLine=document.createElement('div');
+      offLine.style.cssText='position:absolute;left:'+offX+'px;width:'+COL_W+'px;top:'+offY+'px;height:0;border-top:2px solid #ef4444;z-index:4;pointer-events:none;';
+      var offLbl=document.createElement('div');
+      offLbl.style.cssText='position:absolute;left:'+(offX+2)+'px;top:'+(offY-14)+'px;font-size:9px;font-weight:700;color:#ef4444;background:rgba(255,255,255,.85);padding:0 2px;border-radius:2px;z-index:5;pointer-events:none;white-space:nowrap;';
+      offLbl.textContent='⏰ '+minToStr(offMin);
+      grid.appendChild(offLine);grid.appendChild(offLbl);
+    });
+  });
+
+  // 天分隔
+  wk.forEach(function(day,wi){
+    if(wi===0)return;
+    var lx=wi*(TECH_ORDER.length*COL_W+DAY_SEP)-DAY_SEP;
+    var sep2=document.createElement('div');
+    sep2.style.cssText='position:absolute;left:'+lx+'px;top:0;bottom:0;width:'+DAY_SEP+'px;background:var(--surface2);pointer-events:none;border-left:1px solid var(--border);border-right:1px solid var(--border);z-index:2;';
+    grid.appendChild(sep2);
+  });
+
+  // ── Y 座標反算分鐘數（minToY 的反函式）──
+  function yToMin(y){
+    for(var i=0;i<SEGS.length;i++){
+      if(y<=segY[i+1]){
+        var relY=y-segY[i];
+        return Math.round(SEGS[i].s+relY/SEGS[i].px);
+      }
+    }
+    return 1440;
+  }
+  // 對齊到 15 分鐘
+  function snapMin(m){ return Math.round(m/15)*15; }
+
+  // 拖放時的時間提示線
+  var tlHintLine=document.createElement('div');
+  tlHintLine.style.cssText='position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--accent);z-index:20;pointer-events:none;display:none;';
+  var tlHintLbl=document.createElement('div');
+  tlHintLbl.style.cssText='position:absolute;right:4px;top:-16px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;';
+  tlHintLine.appendChild(tlHintLbl);
+  grid.appendChild(tlHintLine);
+
+  // 所有拖放目標（共享陣列，用於拖曳時提升 z-index）
+  var allDzEls=[];
+
+  // 拖放目標
+  wk.forEach(function(day,wi){
+    TECH_ORDER.forEach(function(tn,ti){
+      var dz=document.createElement('div');
+      var dzLeft=wi*(TECH_ORDER.length*COL_W+DAY_SEP)+ti*COL_W;
+      // z-index 平常為 1（低於色塊），拖曳中由 dragstart 提升至 10（高於色塊）
+      dz.style.cssText='position:absolute;left:'+dzLeft+'px;top:0;width:'+COL_W+'px;height:'+(totalH+20)+'px;z-index:1;';
+      dz.dataset.iso=day.iso;
+      dz.dataset.tech=tn;
+      allDzEls.push(dz);
+
+      dz.addEventListener('dragover',function(e){
+        e.preventDefault();e.dataTransfer.dropEffect='move';
+        document.querySelectorAll('.tl-dz-over').forEach(function(d){d.classList.remove('tl-dz-over');d.style.background='';});
+        this.style.background='rgba(37,99,168,.07)';this.classList.add('tl-dz-over');
+        // 顯示時間提示線
+        var sm=snapMin(Math.max(420,Math.min(1380,yToMin(e.offsetY))));
+        tlHintLine.style.display='block';
+        tlHintLine.style.top=minToY(sm)+'px';
+        tlHintLbl.textContent=minToStr(sm);
+      });
+      dz.addEventListener('dragleave',function(e){
+        if(!this.contains(e.relatedTarget)){
+          this.classList.remove('tl-dz-over');this.style.background='';
+          tlHintLine.style.display='none';
+        }
+      });
+      dz.addEventListener('drop',function(e){
+        e.preventDefault();
+        tlHintLine.style.display='none';
+        document.querySelectorAll('.tl-dz-over').forEach(function(d){d.classList.remove('tl-dz-over');d.style.background='';});
+        var dsi=parseInt(e.dataTransfer.getData('tl-si'));
+        var ddi=parseInt(e.dataTransfer.getData('tl-di'));
+        if(isNaN(dsi)||isNaN(ddi))return;
+        var newIso=this.dataset.iso;
+        var newTech=this.dataset.tech;
+        var row=schedule[dsi];
+        if(!row||!row.dates[ddi])return;
+        // ── 計算拖曳落點時間（Y 座標 → 分鐘，15分鐘對齊）──
+        var newStartMin=snapMin(Math.max(420,Math.min(1380,yToMin(e.offsetY))));
+        var newStartTime=minToStr(newStartMin);
+        var oldDs=row.dates[ddi].dateStr;
+        var oldS=row.startMin;var oldE=row.startMin+row.duration;
+        var draggedName=row.name;
+        var splitToAdd=[];
+        for(var i=0;i<schedule.length;i++){
+          var r=schedule[i];if(r.name!==draggedName)continue;
+          for(var d2=0;d2<r.dates.length;d2++){
+            if(r.dates[d2].dateStr===oldDs&&r.startMin===oldS&&(r.startMin+r.duration)===oldE){
+              if(r.dates.length===1){
+                r.dates[0].dateStr=newIso;
+                r.technician=newTech;r.color=getTechColor(newTech);
+                r.startMin=newStartMin;r.start_time=newStartTime;
+                r.modified=true;
+              }else{
+                var taskLabel=r.dates[d2].task;
+                r.dates.splice(d2,1);r.modified=true;
+                splitToAdd.push({id:schedule.length+splitToAdd.length,
+                  name:r.name,area:r.area,district:r.district,region:r.region,group:r.group,
+                  fixed:r.fixed,technician:newTech,work_order:r.work_order||'',
+                  start_time:newStartTime,duration:r.duration,startMin:newStartMin,
+                  need_permit:r.need_permit,is_restaurant:r.is_restaurant,modified:true,
+                  dates:[{dateStr:newIso,task:taskLabel}],color:getTechColor(newTech)});
+                d2--;
+              }
+              break;
+            }
+          }
+        }
+        splitToAdd.forEach(function(nr){schedule.push(nr);});
+        _deduplicateClientRows(draggedName);
+        _invalidateConflictCache();renderAll();renderDayView();renderWorkload();pushUndo();autoSave();
+      });
+      grid.appendChild(dz);
+    });
+  });
+
+  // 任務色塊
+  allItems.forEach(function(it){
+    var row=it.row;
+    var dayIdx=wk.findIndex(function(d){return d.iso===it.dateStr;});
+    if(dayIdx<0)return;
+    var techIdx=TECH_ORDER.indexOf(it.tech);
+    if(techIdx<0)return;
+    var tc=TECH_COLORS[it.tech]||DEF_COLOR;
+    var sMin=Math.max(row.startMin,420);
+    var eMin=Math.min(row.startMin+row.duration,1440);
+    if(eMin<=sMin)return;
+    var top2=minToY(sMin);
+    var h=Math.max(minToY(eMin)-minToY(sMin),20);
+    var left=dayIdx*(TECH_ORDER.length*COL_W+DAY_SEP)+techIdx*COL_W+2;
+
+    (function(bSi,bDi,bRow,bTc,bLeft,bTop,bH,bIsConflict){
+      var block=document.createElement('div');
+      block.style.cssText='position:absolute;left:'+bLeft+'px;top:'+bTop+'px;width:'+(COL_W-4)+'px;min-height:'+bH+'px;background:'+bTc.bg+';border-left:3px solid '+bTc.border+';border-radius:4px;padding:2px 4px;overflow:hidden;cursor:grab;box-sizing:border-box;z-index:3;'+(bIsConflict?'box-shadow:0 0 0 2px #ef4444;':'');
+      if(bRow.fixed){block.style.cursor='pointer';}
+      block.draggable=!bRow.fixed;
+      block.addEventListener('dragstart',function(e){
+        if(bRow.fixed){e.preventDefault();return;}
+        e.dataTransfer.setData('tl-si',String(bSi));
+        e.dataTransfer.setData('tl-di',String(bDi));
+        e.dataTransfer.effectAllowed='move';
+        var ghost=document.createElement('div');
+        ghost.style.cssText='position:fixed;top:-999px;background:'+bTc.bg+';border-left:3px solid '+bTc.border+';color:'+bTc.text+';padding:3px 8px;border-radius:4px;font-size:11px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.2);';
+        ghost.textContent=bRow.name;document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost,60,16);
+        setTimeout(function(){
+          ghost.remove();
+          block.style.opacity='0.4';
+          block.style.pointerEvents='none';// 避免遮擋拖放目標
+          // 將所有拖放目標提升至 z-index:10（高於色塊的 3），同欄上下拖才能偵測
+          allDzEls.forEach(function(dz){dz.style.zIndex='10';});
+        },0);
+      });
+      block.addEventListener('dragend',function(){
+        block.style.opacity='1';
+        block.style.pointerEvents='';
+        allDzEls.forEach(function(dz){dz.style.zIndex='1';});
+        tlHintLine.style.display='none';
+        document.querySelectorAll('.tl-dz-over').forEach(function(d){d.classList.remove('tl-dz-over');d.style.background='';});
+      });
+      block.addEventListener('mouseenter',function(){this.style.zIndex='6';this.style.boxShadow=(bIsConflict?'0 0 0 2px #ef4444,':'')+'0 2px 8px rgba(0,0,0,.18)';});
+      block.addEventListener('mouseleave',function(){this.style.zIndex='3';this.style.boxShadow=bIsConflict?'0 0 0 2px #ef4444':'';});
+      var nameEl=document.createElement('div');
+      nameEl.style.cssText='font-size:10px;font-weight:500;color:'+bTc.text+';white-space:normal;word-break:break-all;line-height:1.35;';
+      nameEl.textContent=(bRow.fixed?'🔒':'')+bRow.name;
+      block.appendChild(nameEl);
+      if(bH>24){
+        var timeEl=document.createElement('div');
+        timeEl.style.cssText='font-size:9px;color:'+bTc.border+';opacity:.85;margin-top:1px;';
+        timeEl.textContent=minToStr(bRow.startMin)+'–'+minToStr(bRow.startMin+bRow.duration);
+        block.appendChild(timeEl);
+      }
+      block.title=bRow.name+' '+minToStr(bRow.startMin)+'–'+minToStr(bRow.startMin+bRow.duration)+(bRow.fixed?' 🔒':'');
+      block.addEventListener('click',function(e){if(e.defaultPrevented)return;e.stopPropagation();_openTlEditPop(bSi,bDi,bRow,e);});
+      grid.appendChild(block);
+    })(it.si,it.di,row,tc,left,top2,h,it.isConflict);
+  });
+
+  // ── 捲動同步（主捲動區 → 表頭X + 時間軸Y + 鏡像捲軸）──
+  mainScroll.addEventListener('scroll',function(){
+    var sx=this.scrollLeft, sy=this.scrollTop;
+    hdrInner.style.transform='translateX(-'+sx+'px)';
+    timeAxInner.style.transform='translateY(-'+sy+'px)';
+    mirrorBar.scrollLeft=sx;
+  });
+  mirrorBar.addEventListener('scroll',function(){
+    mainScroll.scrollLeft=this.scrollLeft;
+    hdrInner.style.transform='translateX(-'+this.scrollLeft+'px)';
+  });
+
+  // 組裝 DOM
+  mainScroll.appendChild(grid);
+  rightArea.appendChild(hdrWrap);
+  rightArea.appendChild(mainScroll);
+  mainArea.appendChild(leftCol);
+  mainArea.appendChild(rightArea);
+  outerWrap.appendChild(mirrorBar);
+  outerWrap.appendChild(mainArea);
+  contentEl.appendChild(outerWrap);
+}
+
+
+function _openTlEditPop(si,di,row,e){
+  // 使用 move-popup（與週覽/日覽相同的「移動案場」彈窗）
+  var ds=row.dates[di].dateStr;
+  // 設定 dvDate 讓 confirmMove 的年份解析正確
+  dvDate=new Date(ds+'T00:00:00');
+  moveTarget={si:si,di:di};
+
+  // 標題：固定 vs 非固定
+  var nameEl=document.getElementById('move-name');
+  var task=row.dates[di].task||'';
+  if(row.fixed){
+    nameEl.textContent='🔒 '+row.name+(task?' — '+task:'')+'（固定日期，時間與防治師可調整）';
+  }else{
+    nameEl.textContent=row.name+(task?' — '+task:'');
+  }
+
+  // 日期欄
+  var dateInp=document.getElementById('move-date');
+  dateInp.value=fmtShort(ds);
+  if(row.fixed){dateInp.readOnly=true;dateInp.style.opacity='0.4';dateInp.style.cursor='not-allowed';}
+  else{dateInp.readOnly=false;dateInp.style.opacity='1';dateInp.style.cursor='';}
+
+  // 時間欄
+  var timeInp=document.getElementById('move-time');
+  timeInp.value=minToStr(row.startMin);
+  timeInp.readOnly=false;timeInp.style.opacity='1';timeInp.style.cursor='';
+
+  // 防治師清單
+  var allTechs=getSiblingTechs(si,di);
+  buildMoveTechList(allTechs);
+
+  // 衝堂警告
+  var cs=detectConflicts();
+  var cw=document.getElementById('conflict-warn');
+  if(cs[si+'|'+di]){cw.style.display='block';cw.textContent='⚠️ 此案場與同防治師其他案場時間重疊！';}
+  else cw.style.display='none';
+  document.getElementById('available-techs-section').style.display='none';
+
+  // 定位並顯示彈窗
+  var popup=document.getElementById('move-popup');
+  popup.style.display='block';
+  var px=Math.min(e.clientX, window.innerWidth-300);
+  var py=e.clientY+8;
+  if(py+320>window.innerHeight)py=Math.max(4,e.clientY-330);
+  popup.style.left=px+'px';popup.style.top=py+'px';
+}
+
 function renderWeekButtons(){
 var weeks=getMonthWeeks();
 var btnContainer=document.getElementById('wv-week-btns');
@@ -2838,6 +3347,7 @@ rangeEl.textContent=parts2[0]+'年'+parseInt(parts2[1])+'月 W'+(wvCurrentWeek+1
 }
 }
 function renderWeekView(){
+if(_wvTimeline){renderTimelineView();return;}
 _syncFixedFromDB();
 var weeks=getMonthWeeks();
 if(!weeks.length){document.getElementById('wv-content').innerHTML='<div class="import-hint"><div class="icon">📆</div><h2>匯入排班後可查看週覽</h2></div>';return;}
@@ -4118,7 +4628,7 @@ function enterAdjMode(){
   _adjMode=true;
   _adjSnap=JSON.parse(JSON.stringify(schedule));
   _adjChanges={};
-  document.getElementById('wv-adj-btn').style.display='none';
+  var _adjBtnEl=document.getElementById('wv-adj-btn');if(_adjBtnEl)_adjBtnEl.style.display='none';
   document.getElementById('wv-adj-banner').style.display='flex';
   document.getElementById('wv-adj-panel').style.width='195px';
   document.getElementById('wv-week-btns').style.display='none';
@@ -4145,7 +4655,7 @@ function exitAdjMode(apply){
     schedule=JSON.parse(JSON.stringify(_adjSnap));
   }
   _adjMode=false;_adjSnap=null;_adjChanges={};_adjDragSi=null;_adjDragDi=null;
-  document.getElementById('wv-adj-btn').style.display='';
+  var _adjBtnEl2=document.getElementById('wv-adj-btn');if(_adjBtnEl2)_adjBtnEl2.style.display='';
   document.getElementById('wv-adj-banner').style.display='none';
   document.getElementById('wv-adj-panel').style.width='0';
   document.getElementById('wv-week-btns').style.display='';
@@ -4535,14 +5045,39 @@ function _showDraftBanner(data){
     +String(ts.getHours()).padStart(2,'0')+':'+String(ts.getMinutes()).padStart(2,'0')+' 儲存）'):'';
   document.getElementById('wv-draft-savedAt').textContent=tsStr;
   var changes=data.changes||{};
+  var n=Object.keys(changes).length;
   var lines=Object.keys(changes).map(function(k){return '• '+_fmtDraftChange(changes[k]);});
   document.getElementById('wv-draft-list').innerHTML=lines.join('<br>');
-  banner.style.display='flex';
+  // 顯示筆數在 toggle 按鈕上
+  var toggle=document.getElementById('wv-draft-toggle');
+  if(toggle)toggle.textContent='▾ 展開明細（'+n+' 筆）';
+  // 重置為收合狀態
+  _draftListExpanded=false;
+  document.getElementById('wv-draft-list').style.display='none';
+  banner.style.maxHeight='120px';
+  banner.style.display='block';
 }
 
 function _hideDraftBanner(){
   var banner=document.getElementById('wv-draft-banner');
   if(banner)banner.style.display='none';
+}
+
+var _draftListExpanded=false;
+function toggleDraftList(){
+  _draftListExpanded=!_draftListExpanded;
+  var list=document.getElementById('wv-draft-list');
+  var toggle=document.getElementById('wv-draft-toggle');
+  var banner=document.getElementById('wv-draft-banner');
+  if(_draftListExpanded){
+    list.style.display='block';
+    banner.style.maxHeight='320px';
+    if(toggle)toggle.textContent='▴ 收合明細';
+  } else {
+    list.style.display='none';
+    banner.style.maxHeight='120px';
+    if(toggle)toggle.textContent='▾ 展開明細';
+  }
 }
 
 function applyDraft(){
