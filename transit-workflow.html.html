@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中轉站建議使用流程</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    font-weight: 300;
+    background: #ffffff;
+    min-height: 100vh;
+    padding: 52px 40px 80px;
+    color: #374151;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 400;
+    color: #374151;
+    margin-bottom: 6px;
+    letter-spacing: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #9ca3af;
+    margin-bottom: 36px;
+    letter-spacing: 2px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 300;
+    color: #6b7280;
+  }
+  .legend-dot { width:15px; height:15px; border-radius:4px; flex-shrink:0; }
+
+  .flow {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .section-badge {
+    display: inline-flex;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 5px 20px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #9ca3af;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .node {
+    border-radius: 10px;
+    padding: 14px 26px;
+    font-size: 15px;
+    font-weight: 300;
+    text-align: center;
+    line-height: 1.75;
+  }
+
+  .n-purple { background:#f5f3ff; border:1.5px solid #c4b5fd; color:#5b21b6; }
+  .n-yellow { background:#fefce8; border:1.5px solid #fde047; color:#713f12; }
+  .n-orange { background:#fff7ed; border:1.5px solid #fed7aa; color:#7c2d12; }
+  .n-red    { background:#fff5f5; border:1.5px solid #fca5a5; color:#b91c1c; }
+  .n-green  { background:#f0fdf4; border:1.5px solid #bbf7d0; color:#15803d; }
+
+  /* Diamond */
+  .diamond-wrap {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    background: #bfdbfe;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .diamond-inner {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    background: #eff6ff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 300;
+    color: #1e3a8a; text-align: center; line-height: 1.5;
+  }
+
+  .note-box {
+    background: #fff0f0;
+    border: 1.5px solid #fca5a5;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px; font-weight: 400;
+    color: #b91c1c; text-align: center;
+  }
+
+  /* Arrows */
+  .arr {
+    width: 1.5px; background: #cbd5e1;
+    position: relative; align-self: center;
+  }
+  .arr::after {
+    content: '';
+    position: absolute; bottom: -1px;
+    left: 50%; transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 9px solid #94a3b8;
+  }
+  .arr-18 { height: 18px; }
+  .arr-28 { height: 28px; }
+  .arr-40 { height: 40px; }
+
+  .source-row { display:flex; gap:20px; justify-content:center; }
+
+  .col-label {
+    font-size: 13px; font-weight: 400;
+    letter-spacing: 1px; margin-bottom: 16px;
+    padding: 4px 18px; border-radius: 999px;
+    color: #6b7280; background: #f3f4f6; border: 1px solid #e5e7eb;
+  }
+
+  .two-col {
+    display: flex; width: 100%;
+    align-items: flex-start; justify-content: center;
+    gap: 40px;
+  }
+  .col {
+    display: flex; flex-direction: column; align-items: center;
+    flex: 1; max-width: 480px;
+  }
+  .sub-split {
+    display: flex; width: 100%;
+    align-items: flex-start; justify-content: center;
+    gap: 20px;
+  }
+  .sub-col {
+    display: flex; flex-direction: column; align-items: center;
+    flex: 1; max-width: 260px;
+  }
+
+  hr.divider {
+    width: 100%; max-width: 800px;
+    border: none; border-top: 1px dashed #e5e7eb;
+    margin: 40px 0 24px;
+  }
+
+  /* horizontal connector */
+  .hconn { position: relative; }
+  .hconn .vl { position:absolute; top:0; width:1.5px; height:100%; background:#cbd5e1; }
+  .hconn .hl { position:absolute; top:0; left:0; right:0; height:1.5px; background:#cbd5e1; }
+</style>
+</head>
+<body>
+
+<h1>中轉站建議使用流程</h1>
+<p class="subtitle">Transit Station — Recommended Workflow</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#f5f3ff;border:1.5px solid #c4b5fd;"></div>通報來源</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fefce8;border:1.5px solid #fde047;"></div>判斷 / 評估</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#eff6ff;border:1.5px solid #bfdbfe;"></div>決策點</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fff7ed;border:1.5px solid #fed7aa;"></div>執行動作</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fff5f5;border:1.5px solid #fca5a5;"></div>緊急處理</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f0fdf4;border:1.5px solid #bbf7d0;"></div>結案</div>
+</div>
+
+<div class="flow">
+
+  <!-- ══ STEP 1 ══ -->
+  <div class="section-badge">Step 1 · 通報訊息處理</div>
+  <div class="source-row">
+    <div class="node n-purple" style="min-width:210px;">📲 客戶自行通報</div>
+    <div class="node n-purple" style="min-width:210px;">✏️ 手動建立通報訊息</div>
+  </div>
+
+  <div style="width:1.5px;height:32px;background:#cbd5e1;position:relative;">
+    <div style="position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #94a3b8;"></div>
+  </div>
+
+  <!-- ══ STEP 2 ══ -->
+  <div class="section-badge">Step 2 · 判別訊息狀態</div>
+
+  <div class="node n-yellow" style="min-width:340px;">看過訊息，先判斷嚴重性</div>
+  <div class="arr arr-40"></div>
+
+  <!-- Diamond 1 -->
+  <div class="diamond-wrap" style="width:300px;height:120px;">
+    <div class="diamond-inner" style="width:296px;height:116px;font-size:14px;">與 Sarah 確認<br>是否需機動？</div>
+  </div>
+
+  <!-- YES / NO split -->
+  <div class="hconn" style="width:64%;max-width:620px;height:48px;">
+    <div class="vl" style="left:0;"></div>
+    <div class="vl" style="right:0;left:auto;"></div>
+    <div class="hl"></div>
+    <span style="position:absolute;left:12px;top:12px;font-size:17px;font-weight:400;color:#ef4444;">YES</span>
+    <span style="position:absolute;right:12px;top:12px;font-size:17px;font-weight:400;color:#6b7280;">NO</span>
+  </div>
+
+  <div class="two-col">
+
+    <!-- ── LEFT: YES ── -->
+    <div class="col">
+      <div class="col-label">優先處理</div>
+      <div class="node n-yellow" style="min-width:260px;">查詢例行前後施作<br>日期與人員</div>
+      <div class="arr arr-18"></div>
+      <div class="node n-red" style="min-width:260px;">點選「機動派工」</div>
+      <div class="arr arr-18"></div>
+      <div class="node n-orange" style="min-width:260px;">選擇實際任務日期（派工日）<br>勾選需通知人員</div>
+      <div class="arr arr-18"></div>
+      <div class="node n-orange" style="min-width:260px;">按下「儲存並結案」</div>
+      <div class="arr arr-18"></div>
+      <div class="node n-green" style="min-width:260px;border-radius:999px;padding:12px 32px;">結案</div>
+    </div>
+
+    <!-- ── RIGHT: NO ── -->
+    <div class="col">
+      <div class="col-label">初步判斷</div>
+      <div class="node n-yellow" style="min-width:280px;">查詢例行前後施作<br>日期與人員</div>
+      <div class="arr arr-28"></div>
+
+      <!-- Diamond 2 -->
+      <div class="diamond-wrap" style="width:200px;height:88px;">
+        <div class="diamond-inner" style="width:196px;height:84px;font-size:14px;">選擇<br>處理方式</div>
+      </div>
+
+      <div class="hconn" style="width:92%;height:36px;">
+        <div class="vl" style="left:0;"></div>
+        <div class="vl" style="right:0;left:auto;"></div>
+        <div class="hl"></div>
+        <span style="position:absolute;left:8px;top:9px;font-size:13px;color:#6b7280;">例行施作處理</span>
+        <span style="position:absolute;right:8px;top:9px;font-size:13px;color:#6b7280;">紀錄即可</span>
+      </div>
+
+      <div class="sub-split">
+
+        <!-- 例行施作 -->
+        <div class="sub-col">
+          <div class="node n-orange" style="width:100%;font-size:13px;">選擇實際任務日期（派工日）<br>勾選需通知人員</div>
+          <div class="arr arr-18"></div>
+          <div class="node n-orange" style="width:100%;font-size:13px;">按下「存檔並上傳<br>（初步判斷）」</div>
+          <div class="arr arr-18"></div>
+          <div class="note-box" style="width:100%;font-size:13px;">⚠ 務必在實際<br>任務日期前結案</div>
+          <div class="arr arr-18"></div>
+          <div class="node n-yellow" style="width:100%;font-size:13px;">→ 進入 Step 3</div>
+        </div>
+
+        <!-- 紀錄即可 -->
+        <div class="sub-col">
+          <div class="node n-orange" style="width:100%;font-size:13px;">勾選需通知人員</div>
+          <div class="arr arr-18"></div>
+          <div class="node n-orange" style="width:100%;font-size:13px;">按下「儲存並結案」</div>
+          <div class="arr arr-18"></div>
+          <div class="node n-green" style="width:100%;font-size:13px;border-radius:8px;text-align:center;">結案</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STEP 3 ══ -->
+  <hr class="divider">
+  <div class="section-badge">Step 3 · 結案判斷</div>
+
+  <div class="node n-yellow" style="min-width:520px;font-size:15px;">在「初步判斷」頁面<br>確認當日距離預計任務日期已達 48 小時前</div>
+  <div class="arr arr-28"></div>
+  <div class="node n-orange" style="min-width:520px;font-size:15px;">確認相關人員已收到行前注意事項通知</div>
+  <div class="arr arr-40"></div>
+  <div class="node n-green" style="min-width:260px;border-radius:999px;padding:13px 52px;font-size:16px;font-weight:400;">✓ 按下結案</div>
+
+</div>
+</body>
+</html>
