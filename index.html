@@ -3397,7 +3397,11 @@ function renderTimelineView(){
         }
         splitToAdd.forEach(function(nr){schedule.push(nr);});
         _deduplicateClientRows(draggedName);
-        _invalidateConflictCache();renderAll();renderDayView();renderWorkload();pushUndo();autoSave();
+        _invalidateConflictCache();
+        var _wvSc2=document.getElementById('wv-scroll');
+        var _wvSL2=_wvSc2?_wvSc2.scrollLeft:0;var _wvST2=_wvSc2?_wvSc2.scrollTop:0;
+        renderAll();renderDayView();renderWorkload();pushUndo();autoSave();
+        if(_wvSc2){_wvSc2.scrollLeft=_wvSL2;_wvSc2.scrollTop=_wvST2;}
       });
       grid.appendChild(dz);
     });
@@ -3772,7 +3776,13 @@ break;
 }
 splitToAdd.forEach(function(nr){schedule.push(nr);});
 _deduplicateClientRows(draggedName);
-_invalidateConflictCache();renderAll();renderDayView();renderWorkload();pushUndo();autoSave();
+_invalidateConflictCache();
+// 保存捲動位置，渲染後還原
+var _wvScroll=document.getElementById('wv-scroll');
+var _wvSL=_wvScroll?_wvScroll.scrollLeft:0;
+var _wvST=_wvScroll?_wvScroll.scrollTop:0;
+renderAll();renderDayView();renderWorkload();pushUndo();autoSave();
+if(_wvScroll){_wvScroll.scrollLeft=_wvSL;_wvScroll.scrollTop=_wvST;}
 // 閃光：找出拖曳後的 si（可能已更新）
 setTimeout(function(){
   var _dsi=parseInt(e.dataTransfer.getData('wv-si'));
