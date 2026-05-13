@@ -5166,7 +5166,17 @@ function confirmGenerate(){
             var iso=mapDateToMonth(de.dateStr,ty,tm);
             if(iso&&!seen[iso]){seen[iso]=true;newDates.push({dateStr:iso,task:de.task});}
             else if(!iso){
-              droppedList.push({name:r.name,tech:r.technician,srcDate:de.dateStr,task:de.task,targetMonth:ym});
+              // 判斷是否因為「第5週」在目標月份不存在導致無法對應（正常情況，靜默略過）
+              var _pp=de.dateStr.split('-');
+              var _sy=parseInt(_pp[0]),_sm=parseInt(_pp[1]),_sd=parseInt(_pp[2]);
+              var _sdt=new Date(_sy,_sm-1,_sd);
+              var _swd=_sdt.getDay()===0?6:_sdt.getDay()-1;
+              var _cnt=0;for(var _i=1;_i<=_sd;_i++){var _idt=new Date(_sy,_sm-1,_i);if((_idt.getDay()===0?6:_idt.getDay()-1)===_swd)_cnt++;}
+              if(_cnt<5){
+                // 非第5週卻對應不上：才加入待處理
+                droppedList.push({name:r.name,tech:r.technician,srcDate:de.dateStr,task:de.task,targetMonth:ym});
+              }
+              // 第5週對應不上：靜默略過，不加入待處理
             }
           });
         }
@@ -5649,8 +5659,8 @@ document.addEventListener('DOMContentLoaded', function(){
 var TEAPOT_IMG='<img src="data:image/png;base64,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" style="width:20px;height:20px;object-fit:contain;vertical-align:middle;flex-shrink:0;" alt="下午">';
 var TIME_SLOTS=[
   {label:'☀️',labelText:'上午',from:0,to:780,svgIcon:null},
-  {label:'🫖',labelText:'下午',from:780,to:1320,svgIcon:TEAPOT_IMG},
-  {label:'🌙',labelText:'夜間',from:1320,to:1440,svgIcon:null}
+  {label:'🫖',labelText:'下午',from:780,to:1290,svgIcon:TEAPOT_IMG},
+  {label:'🌙',labelText:'夜間',from:1290,to:1440,svgIcon:null}
 ];
 
 // ══════════════════════════════════════════════
