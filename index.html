@@ -5,8 +5,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
-<meta name="description" content="防治排班管理系統 v3.2">
-<title>防治排班系統 v3.2</title>
+<meta name="description" content="防治排班管理系統 v3.3">
+<title>防治排班系統 v3.3</title>
 <!-- ═══════════════════════════════════════════════════════
      Firebase 設定區 — 請填入你自己的 Firebase 專案資料
      ═══════════════════════════════════════════════════════ -->
@@ -40,8 +40,12 @@ if(_configured){
     window._fb.serverTimestamp = serverTimestamp;
     window._fb.ready = true;
     console.log('[Firebase] 初始化成功');
+    var _fbs=document.getElementById('fb-status');
+    if(_fbs){_fbs.textContent='☁️ 雲端已連線';_fbs.style.background='#dcfce7';_fbs.style.borderColor='#86efac';_fbs.style.color='#15803d';}
   }catch(e){
     console.warn('[Firebase] 初始化失敗', e);
+    var _fbs=document.getElementById('fb-status');
+    if(_fbs){_fbs.textContent='⚠️ 雲端未連線';_fbs.style.background='#fee2e2';_fbs.style.borderColor='#fca5a5';_fbs.style.color='#c81e3a';}
   }
 }
 </script>
@@ -437,7 +441,7 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 </div>
 
 <header>
-<div class="logo"><div class="logo-icon">🦟</div>防治排班系統<span style="font-size:9px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-left:4px;">v3.2</span></div>
+<div class="logo"><div class="logo-icon">🦟</div>防治排班系統<span style="font-size:9px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-left:4px;">v3.3</span></div>
 <input type="hidden" id="target-month" value="2026-05">
 <button class="btn btn-primary" onclick="openMonthPicker()">🗓 產生排班</button>
 <button class="btn btn-ghost" onclick="openHolidayMgr()">🏖️ 休假管理</button>
@@ -448,6 +452,7 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 <label class="btn btn-ghost" style="cursor:pointer;" title="載入排班 JSON">📂 載入排班<input type="file" accept=".json" style="display:none" onchange="loadScheduleFile(this)"></label>
 <div id="save-status" style="font-size:10px;color:#15803d;display:none;align-items:center;gap:4px;"></div>
 <div id="sync-status" style="font-size:10px;display:none;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);"></div>
+<div id="fb-status" style="font-size:10px;display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;border:1px solid #fde68a;background:#fef9c3;color:#92400e;" title="Firebase 雲端連線狀態">⏳ 雲端連線中…</div>
 <div class="stat-chips">
 <div class="stat-chip" title="客戶管理在線客戶總數">在線客戶<span id="s-db-total">—</span></div>
 <div class="stat-chip" title="本月已排班客戶數">本月排班<span id="s-total">—</span></div>
@@ -4371,15 +4376,25 @@ function _saveTech(){
     // 改名：全面更新 TECH_ORDER, TECH_COLORS, TECH_REGION, TECH_GROUP, schedule, _techContacts
     var oi=TECH_ORDER.indexOf(origName);
     if(oi>=0)TECH_ORDER.splice(oi,1,name);
+    // 若新名字已存在（重複），移除重複項
+    for(var _di=TECH_ORDER.length-1;_di>=0;_di--){if(TECH_ORDER[_di]===name&&_di!==oi)TECH_ORDER.splice(_di,1);}
     if(TECH_COLORS[origName]){TECH_COLORS[name]=TECH_COLORS[origName];delete TECH_COLORS[origName];}
     if(TECH_REGION[origName]!==undefined){TECH_REGION[name]=TECH_REGION[origName];delete TECH_REGION[origName];}
     if(TECH_GROUP[origName]!==undefined){TECH_GROUP[name]=TECH_GROUP[origName];delete TECH_GROUP[origName];}
-    // 更新排班資料
-    schedule.forEach(function(r){if(r.technician===origName)r.technician=name;});
+    // 更新排班資料（含多防治師，如「Casual南, Jane」）
+    schedule.forEach(function(r){
+      if(!r.technician)return;
+      var parts=r.technician.split(',').map(function(t){return t.trim();});
+      var changed=false;
+      parts=parts.map(function(t){if(t===origName){changed=true;return name;}return t;});
+      if(changed)r.technician=parts.join(', ');
+    });
     // 更新聯絡資料
     var ci=_techContacts.findIndex(function(t){return t&&t.name===origName;});
     if(ci>=0){_techContacts[ci]={name:name,phone:phone,email:email,address:address};}
     else{_techContacts.push({name:name,phone:phone,email:email,address:address});}
+    // 同步移除舊名字的聯絡資料（若已被新名取代）
+    _techContacts=_techContacts.filter(function(t){return t&&t.name!==origName;});
     // 重建 UI
     var grid=document.getElementById('cf-tech-grid');
     if(grid){grid.dataset.built='';grid.innerHTML='';_buildClientTechGrid();}
