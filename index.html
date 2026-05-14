@@ -620,6 +620,15 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 
 <div id="tab-export" class="tab-content">
 <div class="scrollable">
+<div class="export-section" style="border:2px solid var(--green);border-radius:10px;padding:14px;margin-bottom:16px;background:rgba(21,128,61,.04);">
+<h3 style="color:var(--green);margin-bottom:6px;">🛡 完整資料備份 / 還原</h3>
+<div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.7;">備份所有資料（排班、自訂客戶、Onboarding、防治師聯絡資料）到一個 JSON 檔案。建議每次重大異動後備份一次。</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+<button class="btn btn-success" onclick="exportFullBackup()" style="font-size:13px;padding:9px 18px;">💾 匯出完整備份</button>
+<label class="btn btn-ghost" style="cursor:pointer;font-size:13px;padding:9px 18px;">📂 從備份還原<input type="file" accept=".json" style="display:none" onchange="importFullBackup(this)"></label>
+<span id="backup-status" style="font-size:11px;color:var(--green);display:none;"></span>
+</div>
+</div>
 <div class="export-section">
 <h3>📊 匯出 Excel（筋斗雲格式）</h3>
 <div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.7;">產生與原始行程相同格式的 Excel 檔案，可直接上傳筋斗雲。</div>
@@ -2836,6 +2845,68 @@ container.innerHTML=html;
 function _fmtDt(dt){return dt.getFullYear()+'/'+(dt.getMonth()+1).toString().padStart(2,'0')+'/'+dt.getDate().toString().padStart(2,'0')+' '+dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');}
 function _fmtDate(dt){return dt.getFullYear()+'/'+(dt.getMonth()+1).toString().padStart(2,'0')+'/'+dt.getDate().toString().padStart(2,'0');}
 function _fmtTime(h,m){return h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0');}
+function exportFullBackup(){
+  var month=document.getElementById('target-month').value||'unknown';
+  var customs=CLIENT_DB.filter(function(c){return c._custom;});
+  var payload={
+    _backup:true,
+    _version:'v3.3',
+    _savedAt:new Date().toISOString(),
+    month:month,
+    schedule:schedule,
+    excluded:Array.from(excluded),
+    customClients:customs,
+    techContacts:_techContacts||[]
+  };
+  var date=new Date().toISOString().slice(0,10);
+  var fname='防治排班_完整備份_'+date+'.json';
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(a.href);},300);
+  var st=document.getElementById('backup-status');
+  if(st){st.textContent='✅ 已備份 ('+new Date().toLocaleString('zh-TW')+')';st.style.display='inline';}
+}
+
+function importFullBackup(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(!data._backup){alert('這不是完整備份檔案，請選擇由「匯出完整備份」產生的 JSON 檔。');return;}
+      if(!confirm('還原備份將覆蓋目前所有資料（排班、客戶、防治師聯絡資料）。確定繼續？'))return;
+      // 還原排班
+      if(data.schedule&&data.schedule.length){
+        schedule=data.schedule;
+        excluded=new Set(data.excluded||[]);
+        for(var i=0;i<schedule.length;i++)schedule[i].color=getTechColor(schedule[i].technician||'');
+        if(data.month)document.getElementById('target-month').value=data.month;
+        document.getElementById('save-btn').style.display='inline-flex';
+        document.getElementById('save-tmpl-btn').style.display='inline-flex';
+      }
+      // 還原自訂客戶 & Onboarding
+      if(data.customClients&&data.customClients.length){
+        for(var j=CLIENT_DB.length-1;j>=0;j--){if(CLIENT_DB[j]._custom)CLIENT_DB.splice(j,1);}
+        data.customClients.forEach(function(c){c._custom=true;CLIENT_DB.push(c);});
+      }
+      // 還原防治師聯絡資料
+      if(data.techContacts&&data.techContacts.length){
+        _techContacts=data.techContacts;
+        _saveTechContacts();
+      }
+      // 同步到 Firebase & localStorage
+      autoSave();_saveCustomClients();
+      buildTechFilters();renderAll();renderDayView();renderWorkload();renderClientTable();renderOnboardingTable();renderTechTable();
+      var st=document.getElementById('backup-status');
+      if(st){st.textContent='✅ 已還原備份 ('+new Date().toLocaleString('zh-TW')+')';st.style.display='inline';}
+      alert('✅ 備份還原成功！');
+    }catch(err){alert('還原失敗：'+err.message);}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
 function exportExcel(type){
 try{
 if(!schedule.length){alert('請先匯入排班');return;}
