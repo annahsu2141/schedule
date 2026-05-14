@@ -449,6 +449,7 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 <button class="btn btn-ghost" onclick="undo()" id="undo-btn" style="display:none" title="復原上一步 (Ctrl+Z)">⎌ 復原</button>
 <button class="btn btn-success" onclick="saveSchedule()" id="save-btn" style="display:none" title="儲存並下載備份檔 (Ctrl+S)">💾 儲存排班<span id="unsaved-badge" style="display:none;background:#c81e3a;border-radius:50%;width:8px;height:8px;margin-left:4px;vertical-align:middle;flex-shrink:0;"></span></button>
 <button class="btn btn-ghost" onclick="openScheduleCheck()" id="check-btn" style="display:none" title="檢核排班是否有漏排或缺防治師">🔍 排班檢核</button>
+<button class="btn btn-ghost" onclick="openCloudMonthPicker()" id="cloud-load-btn" title="從 Firebase 載入指定月份的排班">☁️ 載入雲端</button>
 <label class="btn btn-ghost" style="cursor:pointer;" title="載入排班 JSON">📂 載入排班<input type="file" accept=".json" style="display:none" onchange="loadScheduleFile(this)"></label>
 <div id="save-status" style="font-size:10px;color:#15803d;display:none;align-items:center;gap:4px;"></div>
 <div id="sync-status" style="font-size:10px;display:none;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);"></div>
@@ -5143,6 +5144,55 @@ function mergeScheduleDuplicates(){
   }
 }
 
+function openCloudMonthPicker(){
+  var fb=window._fb;
+  if(!fb||!fb.ready){alert('Firebase 尚未連線，請稍候再試。');return;}
+  var existing=document.getElementById('cloud-month-popup');
+  if(existing){existing.remove();return;}
+  var popup=document.createElement('div');popup.id='cloud-month-popup';
+  popup.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:1001;background:#fff;border:1px solid var(--accent);border-radius:10px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.15);min-width:280px;max-width:340px;';
+  popup.innerHTML='<div style="font-weight:500;margin-bottom:10px;font-size:13px;">☁️ 從雲端載入排班</div>'
+    +'<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">輸入要載入的月份：</div>'
+    +'<input type="month" id="cloud-month-input" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:10px;" value="'+document.getElementById('target-month').value+'">'
+    +'<div style="display:flex;gap:8px;">'
+    +'<button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="_doCloudLoad()">載入</button>'
+    +'<button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById(\'cloud-month-popup\').remove()">取消</button>'
+    +'</div>';
+  document.body.appendChild(popup);
+  document.getElementById('cloud-month-input').focus();
+}
+function _doCloudLoad(){
+  var month=document.getElementById('cloud-month-input').value;
+  if(!month){alert('請選擇月份');return;}
+  var fb=window._fb;
+  if(!fb||!fb.ready){alert('Firebase 尚未連線');return;}
+  var popup=document.getElementById('cloud-month-popup');
+  if(popup)popup.remove();
+  var syncEl=document.getElementById('sync-status');
+  syncEl.style.display='flex';syncEl.style.color='var(--text3)';syncEl.style.borderColor='var(--border)';syncEl.innerHTML='⏳ 從雲端載入中…';
+  var dbRef=fb.ref(fb.db,'schedules/'+month.replace('-','_'));
+  fb.onValue(dbRef,function(snapshot){
+    var data=snapshot.val();
+    if(!data||!data.schedule||!data.schedule.length){
+      syncEl.innerHTML='⚠️ 雲端無此月份資料';syncEl.style.color='var(--red)';
+      setTimeout(function(){syncEl.style.display='none';},3000);
+      return;
+    }
+    schedule=data.schedule;excluded=new Set(data.excluded||[]);
+    for(var i=0;i<schedule.length;i++)schedule[i].color=getTechColor(schedule[i].technician||'');
+    document.getElementById('target-month').value=month;
+    schedule.forEach(function(r){if(r.dates&&r.dates.length>1)r.dates.sort(function(a,b){return a.dateStr<b.dateStr?-1:a.dateStr>b.dateStr?1:0;});});
+    var names={};schedule.forEach(function(r){names[r.name]=true;});
+    Object.keys(names).forEach(function(n){_deduplicateClientRows(n);});
+    _pendingTasks=[];_renderPendingPanel();
+    loadHolidayInput();buildTechFilters();renderAll();renderDayView();renderWorkload();
+    document.getElementById('save-btn').style.display='inline-flex';
+    document.getElementById('save-tmpl-btn').style.display='inline-flex';
+    syncEl.innerHTML='☁️ 已從雲端載入 '+month;syncEl.style.color='var(--green)';syncEl.style.borderColor='rgba(21,128,61,.3)';
+    setTimeout(function(){syncEl.style.display='none';},3000);
+    _fbListening=false;_fbListeningMonth=null;fbListen(month);
+  },{onlyOnce:true});
+}
 function openMonthPicker(){
   var existing=document.getElementById('month-picker-popup');
   if(existing){existing.remove();return;}
