@@ -2853,13 +2853,16 @@ function exportFullBackup(){
   var customs=CLIENT_DB.filter(function(c){return c._custom;});
   var payload={
     _backup:true,
-    _version:'v3.3',
+    _version:'v3.5',
     _savedAt:new Date().toISOString(),
     month:month,
     schedule:schedule,
     excluded:Array.from(excluded),
     customClients:customs,
-    techContacts:_techContacts||[]
+    techContacts:_techContacts||[],
+    deletedNames:Array.from(typeof _deletedNames!=='undefined'?_deletedNames:new Set()),
+    techOrder:TECH_ORDER.slice(),
+    techColors:JSON.parse(JSON.stringify(TECH_COLORS))
   };
   var date=new Date().toISOString().slice(0,10);
   var fname='防治排班_完整備份_'+date+'.json';
@@ -2897,6 +2900,28 @@ function importFullBackup(input){
       if(data.techContacts&&data.techContacts.length){
         _techContacts=data.techContacts;
         _saveTechContacts();
+      }
+      // 還原已刪除客戶名單
+      if(Array.isArray(data.deletedNames)&&data.deletedNames.length){
+        if(typeof _deletedNames!=='undefined'){
+          data.deletedNames.forEach(function(n){_deletedNames.add(n);});
+          try{localStorage.setItem(_DELETED_KEY,JSON.stringify(Array.from(_deletedNames)));}catch(e){}
+          var fb=window._fb;
+          if(fb&&fb.ready){try{fb.set(fb.ref(fb.db,'deleted_clients'),Array.from(_deletedNames));}catch(e){}}
+          // 從 CLIENT_DB 移除已刪除的客戶
+          for(var k=CLIENT_DB.length-1;k>=0;k--){if(_deletedNames.has(CLIENT_DB[k].name))CLIENT_DB.splice(k,1);}
+        }
+      }
+      // 還原防治師清單（若備份中有新防治師）
+      if(Array.isArray(data.techOrder)){
+        data.techOrder.forEach(function(t){
+          if(TECH_ORDER.indexOf(t)<0)TECH_ORDER.push(t);
+        });
+      }
+      if(data.techColors){
+        Object.keys(data.techColors).forEach(function(t){
+          if(!TECH_COLORS[t])TECH_COLORS[t]=data.techColors[t];
+        });
       }
       // 同步到 Firebase & localStorage
       autoSave();_saveCustomClients();
