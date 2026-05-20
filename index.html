@@ -376,6 +376,12 @@ textarea.export-box{width:100%;background:var(--surface2);border:1px solid var(-
 <div style="margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--text3);">
 💡 排班日期由每月匯入的 Excel 決定，此處不需設定排班規則。
 </div>
+<div style="margin-top:10px;">
+<button type="button" id="cf-pause-btn" onclick="toggleClientPause()"
+  style="width:100%;padding:8px 12px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface2);font-size:13px;cursor:pointer;font-weight:500;transition:all .2s;">
+  ⏸ 暫停合約（排班名單自動略過）
+</button>
+</div>
 <div class="modal-actions">
 <button class="btn btn-ghost" onclick="closeClientModal()">取消</button>
 <button class="btn btn-danger" id="cf-del-btn" onclick="deleteClient()" style="display:none">🗑 刪除</button>
@@ -1286,7 +1292,7 @@ function _markSaved(){
 // ── 產生排班 JSON Blob（共用）──
 function _buildPayload(){
   var month=document.getElementById('target-month').value||'unknown';
-  return {version:3,month:month,savedAt:new Date().toISOString(),
+  return {version:3,month:month,savedAt:new Date().toISOString(),_ts:Date.now(),
           excluded:Array.from(excluded),schedule:schedule};
 }
 
@@ -1308,7 +1314,19 @@ if(!month||!schedule.length)return;
 var data=_buildPayload();
 // 1. localStorage 快取
 try{localStorage.setItem('schedule_'+month,JSON.stringify(data));}catch(err){}
-// 2. 下載 JSON 存檔（⭐ 防止瀏覽器清除造成資料流失）
+// 2. Firebase 雲端同步（讓同事可以「載入雲端」讀到）
+var fb=window._fb;
+if(fb&&fb.ready){
+  var dbRef=fb.ref(fb.db,'schedules/'+month.replace('-','_'));
+  _fbIgnoreNext=true;// 告訴 fbListen 跳過這次自己觸發的更新，避免覆蓋
+  fb.set(dbRef,data).then(function(){
+    var syncEl=document.getElementById('sync-status');
+    syncEl.style.display='flex';syncEl.style.color='var(--green)';syncEl.style.borderColor='var(--green)';
+    syncEl.innerHTML='☁️ 已同步雲端';
+    setTimeout(function(){syncEl.style.display='none';},4000);
+  }).catch(function(e){console.warn('Firebase schedule save failed:',e);});
+}
+// 3. 下載 JSON 存檔（⭐ 防止瀏覽器清除造成資料流失）
 var fname=_downloadJSON(data,'');
 _markSaved();
 var status=document.getElementById('save-status');
@@ -1701,6 +1719,8 @@ function renderMain(){
       var inSchedule=hasSchedule&&!!schedMap[name];
       // 勾選狀態：有排班日期的客戶用 excluded；其餘用 _preExcluded
       var isExcl=inSchedule?excluded.has(name):_preExcluded.has(name);
+      // 暫停合約：強制視為排除，不受 excluded/preExcluded 影響
+      if(c.paused)isExcl=true;
       var tc=TECH_COLORS[(c.technician||'').split(',')[0].trim()]||DEF_COLOR;
 
       var tr=document.createElement('tr');
@@ -1741,7 +1761,9 @@ function renderMain(){
 
       // ── 名稱欄 ──
       var tdName=document.createElement('td');
-      var nameDiv=document.createElement('div');nameDiv.className='client-name';nameDiv.title=name;nameDiv.textContent=name;
+      var nameDiv=document.createElement('div');nameDiv.className='client-name';nameDiv.title=name;
+      nameDiv.textContent=name;
+      if(c.paused){var pauseBadge=document.createElement('span');pauseBadge.textContent='⏸ 暫停';pauseBadge.style.cssText='margin-left:6px;font-size:10px;font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:1px 5px;vertical-align:middle;';nameDiv.appendChild(pauseBadge);}
       var groupDiv=document.createElement('div');groupDiv.className='client-group';groupDiv.textContent=c.group||'';
       tdName.appendChild(nameDiv);tdName.appendChild(groupDiv);
       // 問題標籤（顯示在名稱下方）
@@ -4100,14 +4122,27 @@ function _getClientSelectedTechs(){
   return Array.from(checks).map(function(c){return c.value;}).join(',');
 }
 
+var _cfPaused=false;
+function _updatePauseBtn(){
+  var btn=document.getElementById('cf-pause-btn');if(!btn)return;
+  if(_cfPaused){
+    btn.style.background='#fef3c7';btn.style.borderColor='#f59e0b';btn.style.color='#92400e';
+    btn.innerHTML='⏸ 暫停中（點擊恢復合約）';
+  }else{
+    btn.style.background='var(--surface2)';btn.style.borderColor='var(--border)';btn.style.color='var(--text)';
+    btn.innerHTML='⏸ 暫停合約（排班名單自動略過）';
+  }
+}
+function toggleClientPause(){_cfPaused=!_cfPaused;_updatePauseBtn();}
 function openClientModal(idx){
 _buildClientTechGrid();
 var isNew=idx===-1;
 document.getElementById('modal-title').textContent=isNew?'新增客戶資料':'編輯客戶資料';
 document.getElementById('cf-edit-idx').value=idx;
 document.getElementById('cf-del-btn').style.display=isNew?'none':'inline-flex';
-if(isNew){document.getElementById('cf-name').value='';document.getElementById('cf-group').value='';document.getElementById('cf-cid').value='';document.getElementById('cf-freq').value='';document.getElementById('cf-area').value='';document.getElementById('cf-region').value='北';_setClientTechGrid('');document.getElementById('cf-time').value='';document.getElementById('cf-duration').value='45';document.getElementById('cf-fixed').value='0';document.getElementById('cf-permit').value='0';document.getElementById('cf-workorder').value='';document.getElementById('cf-restaurant').value='1';}
-else{var c=CLIENT_DB[idx];document.getElementById('cf-name').value=c.name||'';document.getElementById('cf-group').value=c.group||'';document.getElementById('cf-cid').value=c.id||'';document.getElementById('cf-freq').value=c.freq||'';document.getElementById('cf-area').value=c.area||'';document.getElementById('cf-region').value=c.region||'北';_setClientTechGrid(c.technician||'');document.getElementById('cf-time').value=c.time||'';document.getElementById('cf-duration').value=c.duration||45;document.getElementById('cf-fixed').value=c.fixed?'1':'0';document.getElementById('cf-permit').value=c.need_permit?'1':'0';document.getElementById('cf-workorder').value=c.work_order||'';document.getElementById('cf-restaurant').value=typeof c.is_restaurant!=='undefined'?(c.is_restaurant?'1':'0'):'1';}
+if(isNew){document.getElementById('cf-name').value='';document.getElementById('cf-group').value='';document.getElementById('cf-cid').value='';document.getElementById('cf-freq').value='';document.getElementById('cf-area').value='';document.getElementById('cf-region').value='北';_setClientTechGrid('');document.getElementById('cf-time').value='';document.getElementById('cf-duration').value='45';document.getElementById('cf-fixed').value='0';document.getElementById('cf-permit').value='0';document.getElementById('cf-workorder').value='';document.getElementById('cf-restaurant').value='1';_cfPaused=false;}
+else{var c=CLIENT_DB[idx];document.getElementById('cf-name').value=c.name||'';document.getElementById('cf-group').value=c.group||'';document.getElementById('cf-cid').value=c.id||'';document.getElementById('cf-freq').value=c.freq||'';document.getElementById('cf-area').value=c.area||'';document.getElementById('cf-region').value=c.region||'北';_setClientTechGrid(c.technician||'');document.getElementById('cf-time').value=c.time||'';document.getElementById('cf-duration').value=c.duration||45;document.getElementById('cf-fixed').value=c.fixed?'1':'0';document.getElementById('cf-permit').value=c.need_permit?'1':'0';document.getElementById('cf-workorder').value=c.work_order||'';document.getElementById('cf-restaurant').value=typeof c.is_restaurant!=='undefined'?(c.is_restaurant?'1':'0'):'1';_cfPaused=!!(c.paused);}
+_updatePauseBtn();
 document.getElementById('client-modal').classList.add('show');
 }
 function closeClientModal(){document.getElementById('client-modal').classList.remove('show');}
@@ -4115,7 +4150,7 @@ function saveClient(){
 var name=document.getElementById('cf-name').value.trim();if(!name){alert('請輸入客戶名稱');return;}
 var tech=_getClientSelectedTechs();if(!tech){alert('請至少選擇一位防治師');return;}
 var freqRaw=parseInt(document.getElementById('cf-freq').value);
-var client={name:name,group:document.getElementById('cf-group').value.trim(),id:document.getElementById('cf-cid').value.trim(),freq:freqRaw>0?freqRaw:null,area:document.getElementById('cf-area').value.trim(),district:document.getElementById('cf-area').value.trim(),region:document.getElementById('cf-region').value,technician:tech,time:document.getElementById('cf-time').value.trim(),start_time:document.getElementById('cf-time').value.trim(),duration:parseInt(document.getElementById('cf-duration').value)||45,fixed:document.getElementById('cf-fixed').value==='1',need_permit:document.getElementById('cf-permit').value==='1',work_order:document.getElementById('cf-workorder').value.trim(),is_restaurant:document.getElementById('cf-restaurant').value==='1',date_entries:[]};
+var client={name:name,group:document.getElementById('cf-group').value.trim(),id:document.getElementById('cf-cid').value.trim(),freq:freqRaw>0?freqRaw:null,area:document.getElementById('cf-area').value.trim(),district:document.getElementById('cf-area').value.trim(),region:document.getElementById('cf-region').value,technician:tech,time:document.getElementById('cf-time').value.trim(),start_time:document.getElementById('cf-time').value.trim(),duration:parseInt(document.getElementById('cf-duration').value)||45,fixed:document.getElementById('cf-fixed').value==='1',need_permit:document.getElementById('cf-permit').value==='1',work_order:document.getElementById('cf-workorder').value.trim(),is_restaurant:document.getElementById('cf-restaurant').value==='1',paused:_cfPaused,date_entries:[]};
 var ei=parseInt(document.getElementById('cf-edit-idx').value);
 if(ei===-1){
   client._custom=true;
@@ -4154,8 +4189,9 @@ var area=c.area||c.district||'—';
 var cidCell=c.id?'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);">'+c.id+'</span>':'<span style="color:var(--text3);font-size:11px;">—</span>';
 var freqCell=c.freq?'<span style="font-family:DM Mono,monospace;font-size:12px;font-weight:600;color:var(--accent);">'+c.freq+'</span>':'<span style="color:var(--text3);font-size:11px;">—</span>';
 var woCell=c.work_order?'<span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text2);">'+c.work_order+'</span>':'<span style="color:var(--text3);font-size:11px;">—</span>';
-html+='<tr>'
-  +'<td style="overflow:hidden;"><div class="client-name" title="'+c.name+'">'+c.name+'</div><div class="client-group">'+(c.group||area)+'</div></td>'
+var pauseTag=c.paused?'<span style="margin-left:5px;font-size:10px;font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:1px 5px;">⏸ 暫停</span>':'';
+html+='<tr'+(c.paused?' style="opacity:.6;"':'')+'>'
+  +'<td style="overflow:hidden;"><div class="client-name" title="'+c.name+'">'+c.name+pauseTag+'</div><div class="client-group">'+(c.group||area)+'</div></td>'
   +'<td style="overflow:hidden;">'+cidCell+'</td>'
   +'<td style="text-align:center;">'+freqCell+'</td>'
   +'<td style="overflow:hidden;">'+woCell+'</td>'
