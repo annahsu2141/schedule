@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壽司郎報告追蹤</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+
+  header { background: #fff; border-bottom: 1px solid #e5e5e3; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: sticky; top: 0; z-index: 10; }
+  .header-left h1 { font-size: 17px; font-weight: 500; }
+  .header-left p { font-size: 13px; color: #888; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .summary-chips { display: flex; gap: 8px; }
+  .chip { font-size: 13px; padding: 4px 12px; border-radius: 20px; font-weight: 500; }
+  .chip-ok { background: #eaf3de; color: #27500a; }
+  .chip-missing { background: #fcebeb; color: #791f1f; }
+  .chip-neutral { background: #f1efe8; color: #444441; }
+
+  .btn { font-size: 13px; padding: 6px 14px; border-radius: 8px; border: 1px solid #d3d1c7; background: #fff; color: #444; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: #f5f5f3; }
+  .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .btn-primary:hover { background: #333; }
+
+  .scan-bar { background: #fff; border: 1px dashed #d3d1c7; border-radius: 12px; margin: 20px 24px 0; padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .scan-bar.has-result { border-style: solid; border-color: #9fe1cb; background: #f0fbf7; }
+  .scan-icon { font-size: 28px; }
+  .scan-text h2 { font-size: 15px; font-weight: 500; }
+  .scan-text p { font-size: 13px; color: #888; margin-top: 3px; }
+  .scan-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding: 20px 24px 40px; }
+  .card { background: #fff; border: 1px solid #e5e5e3; border-radius: 12px; overflow: hidden; transition: opacity .25s; }
+  .card.all-done { opacity: .4; }
+  .card-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; flex-shrink: 0; }
+  .person-name { font-size: 15px; font-weight: 500; }
+  .person-sub { font-size: 12px; color: #888; margin-top: 1px; }
+  .store-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .store-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; transition: background .15s; }
+  .store-row.pending { background: #f5f5f3; }
+  .store-row.pending:hover { background: #ebe9e2; }
+  .store-row.done .store-name { text-decoration: line-through; color: #aaa; }
+  .store-row input[type=checkbox] { width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; accent-color: #1d9e75; }
+  .store-name { font-size: 13px; color: #555; line-height: 1.4; user-select: none; flex: 1; }
+  .tag-auto { font-size: 10px; padding: 1px 5px; border-radius: 10px; background: #e1f5ee; color: #085041; flex-shrink: 0; }
+  .tag-manual { font-size: 10px; padding: 1px 5px; border-radius: 10px; background: #faeeda; color: #633806; flex-shrink: 0; }
+
+  #not-supported { background: #fcebeb; border: 1px solid #f09595; border-radius: 12px; margin: 20px 24px; padding: 16px 20px; font-size: 14px; color: #791f1f; display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>壽司郎 · 報告收件追蹤</h1>
+    <p id="scan-label">尚未掃描資料夾</p>
+  </div>
+  <div class="header-right">
+    <div class="summary-chips">
+      <span class="chip chip-missing" id="chip-missing" style="display:none"></span>
+      <span class="chip chip-ok" id="chip-ok" style="display:none"></span>
+    </div>
+    <button class="btn" onclick="resetAll()" id="btn-reset" style="display:none">重置全部</button>
+  </div>
+</header>
+
+<div id="not-supported">⚠️ 此功能需要 Chrome 或 Edge 瀏覽器才能使用「選擇資料夾」功能。請改用 Chrome 開啟此頁面。</div>
+
+<div class="scan-bar" id="scan-bar">
+  <div class="scan-icon">📂</div>
+  <div class="scan-text">
+    <h2>選擇當月報告資料夾</h2>
+    <p>選擇下載好的報告資料夾，系統會自動比對哪些店已交報告</p>
+  </div>
+  <div class="scan-actions">
+    <button class="btn btn-primary" onclick="pickFolder()">選擇資料夾</button>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const PEOPLE = [
+  {name:"Sarah",   color:"#B5D4F4", text:"#0C447C", stores:["館前路店","中華路店","新北中和環球店","漢口路店","高雄中正店","台南永康店"]},
+  {name:"Daniel",  color:"#C0DD97", text:"#27500A", stores:["民權建國店","台南西門路店","新竹慈雲路店","汐止遠雄店","石牌店"]},
+  {name:"Ivan",    color:"#F4C0D1", text:"#72243E", stores:["黎明市政南店","桃園國際路店","土城日月光店","宜蘭站前店","彰化員林大道店","板橋府中店"]},
+  {name:"政軒",   color:"#CECBF6", text:"#3C3489", stores:["福科路店","台北松江店","台北永春店","新竹巨城店"]},
+  {name:"HB",      color:"#FAC775", text:"#633806", stores:["台南南紡店","高雄鳳山店","台北公館店"]},
+  {name:"Hubert",  color:"#9FE1CB", text:"#085041", stores:["台南安平店","台北內湖美麗華店","新莊中平店","台北南港CityLink店"]},
+  {name:"松霖",   color:"#F5C4B3", text:"#712B13", stores:["高雄義享天地店","台北林森店","彰化金馬店","淡水新市店"]},
+  {name:"Ray",     color:"#D3D1C7", text:"#444441", stores:["天母高島屋店","高雄岡山秀泰店","徐匯廣場店"]},
+  {name:"Jane",    color:"#AFA9EC", text:"#26215C", stores:["板橋新埔店","青埔店"]},
+];
+
+// state: { "Sarah_館前路店": { checked: true, auto: true } }
+const KEY = "sushiro_report_state";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch(e) {}
+
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
+
+// Build cards
+const grid = document.getElementById("grid");
+PEOPLE.forEach(p => {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.id = "card-" + p.name;
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="avatar" style="background:${p.color};color:${p.text}">${p.name.slice(0,2)}</div>
+      <div><div class="person-name">${p.name}</div><div class="person-sub" id="sub-${p.name}"></div></div>
+    </div>
+    <div class="store-list">
+      ${p.stores.map(st => {
+        const k = p.name + "_" + st;
+        return `<label class="store-row" id="row-${k}" data-key="${k}">
+          <input type="checkbox" data-key="${k}">
+          <span class="store-name">${st}</span>
+          <span class="tag-auto" id="tag-${k}" style="display:none">自動</span>
+          <span class="tag-manual" id="tagm-${k}" style="display:none">手動</span>
+        </label>`;
+      }).join("")}
+    </div>`;
+  card.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", e => {
+      const k = e.target.dataset.key;
+      state[k] = { checked: e.target.checked, auto: false };
+      save();
+      renderCard(p);
+      renderSummary();
+    });
+  });
+  grid.appendChild(card);
+  renderCard(p);
+});
+renderSummary();
+
+function renderCard(p) {
+  let pending = 0;
+  p.stores.forEach(st => {
+    const k = p.name + "_" + st;
+    const v = state[k];
+    const row = document.getElementById("row-" + k);
+    const cb = row.querySelector("input");
+    const tagA = document.getElementById("tag-" + k);
+    const tagM = document.getElementById("tagm-" + k);
+    if (v?.checked) {
+      row.classList.add("done"); row.classList.remove("pending"); cb.checked = true;
+      tagA.style.display = v.auto ? "" : "none";
+      tagM.style.display = (!v.auto) ? "" : "none";
+    } else {
+      row.classList.remove("done"); row.classList.add("pending"); cb.checked = false;
+      tagA.style.display = "none"; tagM.style.display = "none";
+      pending++;
+    }
+  });
+  const card = document.getElementById("card-" + p.name);
+  const sub = document.getElementById("sub-" + p.name);
+  if (pending === 0) { card.classList.add("all-done"); sub.textContent = "全部已收 ✓"; }
+  else { card.classList.remove("all-done"); sub.textContent = "未收 " + pending + " 家"; }
+}
+
+function renderSummary() {
+  let done = 0, total = 0;
+  PEOPLE.forEach(p => p.stores.forEach(st => {
+    total++;
+    if (state[p.name + "_" + st]?.checked) done++;
+  }));
+  const missing = total - done;
+  const cm = document.getElementById("chip-missing");
+  const co = document.getElementById("chip-ok");
+  cm.style.display = missing > 0 ? "" : "none";
+  co.style.display = done > 0 ? "" : "none";
+  cm.textContent = "未收 " + missing + " 家";
+  co.textContent = "已收 " + done + " 家";
+  document.getElementById("btn-reset").style.display = (done > 0) ? "" : "none";
+}
+
+function resetAll() {
+  if (!confirm("確定要清除所有勾選紀錄嗎？")) return;
+  state = {};
+  save();
+  PEOPLE.forEach(p => renderCard(p));
+  renderSummary();
+  document.getElementById("scan-label").textContent = "尚未掃描資料夾";
+  document.getElementById("scan-bar").classList.remove("has-result");
+}
+
+async function pickFolder() {
+  if (!window.showDirectoryPicker) {
+    document.getElementById("not-supported").style.display = "block";
+    return;
+  }
+  try {
+    const dir = await window.showDirectoryPicker({ mode: "read" });
+    const files = [];
+    for await (const entry of dir.values()) {
+      if (entry.kind === "file") files.push(entry.name);
+    }
+    applyScannedFiles(files, dir.name);
+  } catch(e) {
+    if (e.name !== "AbortError") alert("無法讀取資料夾：" + e.message);
+  }
+}
+
+function applyScannedFiles(files, folderName) {
+  // Clear previous auto-checks
+  Object.keys(state).forEach(k => { if (state[k]?.auto) delete state[k]; });
+
+  let autoCount = 0;
+  PEOPLE.forEach(p => {
+    p.stores.forEach(st => {
+      const k = p.name + "_" + st;
+      // Match: check if any filename contains the store name (remove 店 suffix for flexibility)
+      const storeName = st.replace("店", "");
+      const found = files.some(f => f.includes(storeName));
+      if (found) {
+        if (!state[k]?.checked) { // don't overwrite manual
+          state[k] = { checked: true, auto: true };
+          autoCount++;
+        }
+      }
+    });
+  });
+  save();
+  PEOPLE.forEach(p => renderCard(p));
+  renderSummary();
+
+  const label = document.getElementById("scan-label");
+  const now = new Date().toLocaleDateString("zh-TW");
+  label.textContent = `📂 ${folderName}  ·  自動比對 ${autoCount} 家  ·  ${now}`;
+  document.getElementById("scan-bar").classList.add("has-result");
+}
+
+// Check browser support
+if (!window.showDirectoryPicker) {
+  document.getElementById("not-supported").style.display = "block";
+}
+</script>
+</body>
+</html>
