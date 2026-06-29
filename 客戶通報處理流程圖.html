@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客戶通報處理流程</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    font-weight: 300;
+    background: #ffffff;
+    min-height: 100vh;
+    padding: 52px 40px 80px;
+    color: #374151;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 400;
+    color: #374151;
+    margin-bottom: 6px;
+    letter-spacing: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 16px;
+    color: #9ca3af;
+    margin-bottom: 36px;
+    letter-spacing: 2px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 52px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 15px;
+    font-weight: 300;
+    color: #6b7280;
+  }
+  .legend-dot { width:15px; height:15px; border-radius:4px; flex-shrink:0; }
+
+  /* Section wrapper */
+  .section {
+    max-width: 900px;
+    margin: 0 auto 60px;
+  }
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+  .section-number {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: #374151;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 400;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-label {
+    font-size: 21px;
+    font-weight: 400;
+    color: #374151;
+    letter-spacing: 1px;
+  }
+  .section-desc {
+    font-size: 15px;
+    color: #9ca3af;
+    margin-top: 2px;
+    letter-spacing: 1px;
+  }
+
+  /* Nodes */
+  .node {
+    border-radius: 10px;
+    padding: 15px 28px;
+    font-size: 17px;
+    font-weight: 300;
+    text-align: center;
+    line-height: 1.75;
+  }
+  .n-purple { background:#ede9fe; border:2px solid #a78bfa; color:#4c1d95; }
+  .n-yellow { background:#fef9c3; border:2px solid #facc15; color:#713f12; }
+  .n-orange { background:#ffedd5; border:2px solid #fb923c; color:#7c2d12; }
+  .n-green  { background:#dcfce7; border:2px solid #4ade80; color:#14532d; }
+  .n-blue   { background:#dbeafe; border:2px solid #60a5fa; color:#1e3a8a; }
+  .n-gray   { background:#f3f4f6; border:2px solid #9ca3af; color:#1f2937; }
+
+  /* Tag on node to indicate role */
+  .role-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 400;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+  .tag-admin { background:#e0e7ff; color:#3730a3; }
+  .tag-tech  { background:#dcfce7; color:#15803d; }
+
+  /* Diamond */
+  .diamond-wrap {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    background: #3b82f6;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .diamond-inner {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    background: #dbeafe;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 400;
+    color: #1e3a8a; text-align: center; line-height: 1.5;
+  }
+
+  /* Flow column */
+  .flow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Arrow */
+  .arr {
+    width: 1.5px; background: #cbd5e1;
+    position: relative; align-self: center;
+    flex-shrink: 0;
+  }
+  .arr::after {
+    content: '';
+    position: absolute; bottom: -1px;
+    left: 50%; transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 9px solid #94a3b8;
+  }
+  .arr-20 { height: 20px; }
+  .arr-32 { height: 32px; }
+
+  /* Arrow label (yes/no) */
+  .arr-label {
+    font-size: 13px; font-weight: 400;
+    color: #6b7280;
+    align-self: center;
+  }
+  .arr-label.yes { color: #ef4444; }
+  .arr-label.no  { color: #6b7280; }
+
+  /* Two col split */
+  .split {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+  }
+  .split-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    max-width: 400px;
+  }
+  .split-col-label {
+    font-size: 14px;
+    color: #9ca3af;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 4px 16px;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* Horizontal connector bar */
+  .hbar {
+    width: 100%;
+    position: relative;
+    height: 44px;
+  }
+  .hbar .hline {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1.5px; background: #cbd5e1;
+  }
+  .hbar .vline-l {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1.5px; height: 100%; background: #cbd5e1;
+  }
+  .hbar .vline-r {
+    position: absolute;
+    top: 0; right: 0;
+    width: 1.5px; height: 100%; background: #cbd5e1;
+  }
+  .hbar .label-l {
+    position: absolute;
+    left: 14px; top: 10px;
+    font-size: 16px; font-weight: 400; color: #ef4444;
+  }
+  .hbar .label-r {
+    position: absolute;
+    right: 14px; top: 10px;
+    font-size: 16px; font-weight: 400; color: #6b7280;
+  }
+
+  hr.divider {
+    max-width: 860px;
+    margin: 0 auto 52px;
+    border: none;
+    border-top: 1px dashed #e5e7eb;
+  }
+
+  /* Apollo badge */
+  .system-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1e3a8a;
+    color: #fff;
+    font-size: 17px;
+    font-weight: 400;
+    padding: 12px 32px;
+    border-radius: 8px;
+    letter-spacing: 1px;
+  }
+
+  .end-pill {
+    background: #dcfce7;
+    border: 2px solid #4ade80;
+    color: #14532d;
+    border-radius: 999px;
+    padding: 12px 44px;
+    font-size: 17px;
+    font-weight: 400;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>客戶通報處理流程</h1>
+<p class="subtitle">行政後勤作業說明 · Administrative Workflow</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#f5f3ff;border:1.5px solid #c4b5fd;"></div>通報來源</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fefce8;border:1.5px solid #fde047;"></div>後勤判斷 / 查詢</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#eff6ff;border:1.5px solid #bfdbfe;"></div>決策點</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fff7ed;border:1.5px solid #fed7aa;"></div>執行動作</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f0fdf4;border:1.5px solid #bbf7d0;"></div>結案 / 完成</div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- FLOW 1                                      -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="section-number">1</div>
+    <div>
+      <div class="section-label">例行或機動通報</div>
+      <div class="section-desc">客戶於 Pesto 後台進行通報後的標準處理流程</div>
+    </div>
+  </div>
+
+  <div class="flow-col">
+
+    <!-- 起點 -->
+    <div class="node n-purple" style="min-width:340px;">
+      📲 客戶於 Pesto 後台通報
+    </div>
+    <div class="arr arr-20"></div>
+
+    <div class="node n-gray" style="min-width:340px;">
+      通報訊息進入中轉站
+    </div>
+    <div class="arr arr-20"></div>
+
+    <div class="node n-yellow" style="min-width:340px;">
+      後勤進行初步判斷
+    </div>
+    <div class="arr arr-32"></div>
+
+    <!-- 決策菱形 -->
+    <div class="diamond-wrap" style="width:260px;height:104px;">
+      <div class="diamond-inner" style="width:256px;height:100px;">需要機動？</div>
+    </div>
+
+    <!-- YES / NO 分岔 -->
+    <div class="hbar" style="max-width:680px;">
+      <div class="hline"></div>
+      <div class="vline-l"></div>
+      <div class="vline-r"></div>
+      <span class="label-l">YES</span>
+      <span class="label-r">NO</span>
+    </div>
+
+    <div class="split" style="max-width:680px;">
+
+      <!-- YES 路徑 -->
+      <div class="split-col">
+        <div class="split-col-label">機動處理</div>
+        <div class="node n-orange" style="min-width:260px;">
+          後勤安排機動派工
+        </div>
+        <div class="arr arr-20"></div>
+        <div class="node n-orange" style="min-width:260px; border-color:#86efac; color:#15803d; background:#f0fdf4;">
+          ✉️ 通知防治師需要出動
+          <div style="font-size:14px;color:#4ade80;margin-top:2px;">← 防治師這邊會收到通知</div>
+        </div>
+        <div class="arr arr-20"></div>
+        <div class="end-pill" style="min-width:200px;">✓ 24 小時內結案</div>
+      </div>
+
+      <!-- NO 路徑 -->
+      <div class="split-col">
+        <div class="split-col-label">一般處理</div>
+        <div class="node n-orange" style="min-width:260px;">
+          後勤依狀況記錄處理
+        </div>
+        <div class="arr arr-20"></div>
+        <div class="node n-orange" style="min-width:260px; border-color:#86efac; color:#15803d; background:#f0fdf4;">
+          ✉️ 通知相關人員
+          <div style="font-size:14px;color:#4ade80;margin-top:2px;">← 視情況通知防治師</div>
+        </div>
+        <div class="arr arr-20"></div>
+        <div class="end-pill" style="min-width:200px;">✓ 24 小時內結案</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════════ -->
+<!-- FLOW 2                                      -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="section-number">2</div>
+    <div>
+      <div class="section-label">通報後續作業</div>
+      <div class="section-desc">客戶詢問通報處理後續時的查詢與回覆流程</div>
+    </div>
+  </div>
+
+  <div class="flow-col">
+
+    <div class="node n-purple" style="min-width:380px;">
+      💬 客戶詢問通報處理後續
+    </div>
+    <div class="arr arr-20"></div>
+
+    <div class="node n-yellow" style="min-width:380px;">
+      後勤查詢施作工單<br>
+      <span style="font-size:14px;color:#92400e;">（檢查施作內容與結果）</span>
+    </div>
+    <div class="arr arr-32"></div>
+
+    <!-- 決策菱形 -->
+    <div class="diamond-wrap" style="width:280px;height:112px;">
+      <div class="diamond-inner" style="width:276px;height:108px; font-size:13px;">工單資訊<br>足以直接回覆？</div>
+    </div>
+
+    <div class="hbar" style="max-width:680px;">
+      <div class="hline"></div>
+      <div class="vline-l"></div>
+      <div class="vline-r"></div>
+      <span class="label-l">YES</span>
+      <span class="label-r">NO</span>
+    </div>
+
+    <div class="split" style="max-width:680px;">
+
+      <!-- YES -->
+      <div class="split-col">
+        <div class="split-col-label">可直接回覆</div>
+        <div class="node n-orange" style="min-width:260px;">
+          後勤依工單內容<br>直接回覆客戶
+        </div>
+        <div class="arr arr-20"></div>
+        <div class="end-pill" style="min-width:200px;">✓ 完成</div>
+      </div>
+
+      <!-- NO -->
+      <div class="split-col">
+        <div class="split-col-label">需確認細節</div>
+        <div class="node n-orange" style="min-width:260px; border-color:#86efac; color:#15803d; background:#f0fdf4;">
+          📞 聯繫防治師<br>確認施作細節
+          <div style="font-size:14px;color:#4ade80;margin-top:2px;">← 防治師這邊會被聯繫</div>
+        </div>
+        <div class="arr arr-20"></div>
+        <div class="node n-orange" style="min-width:260px;">
+          取得細節後<br>回覆客戶
+        </div>
+        <div class="arr arr-20"></div>
+        <div class="end-pill" style="min-width:200px;">✓ 完成</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════════ -->
+<!-- FLOW 3                                      -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <div class="section-number">3</div>
+    <div>
+      <div class="section-label">非例行捕獲通報</div>
+      <div class="section-desc">客戶通報捕獲數據，系統自動轉入 Apollo 統計</div>
+    </div>
+  </div>
+
+  <div class="flow-col">
+
+    <div class="node n-purple" style="min-width:380px;">
+      🐛 客戶通報非例行捕獲
+    </div>
+    <div class="arr arr-20"></div>
+
+    <div class="node n-yellow" style="min-width:380px;">
+      中轉站將訊息內容<br>直接轉為數據登入
+    </div>
+    <div class="arr arr-20"></div>
+
+    <div class="system-badge">
+      📊 &nbsp;數據連結至 Apollo
+    </div>
+    <div style="margin-top:6px;font-size:14px;color:#9ca3af;text-align:center;">（Apollo = 數據統計系統）</div>
+    <div class="arr arr-20"></div>
+
+    <div class="end-pill" style="min-width:200px;">✓ 完成</div>
+
+  </div>
+</div>
+
+</body>
+</html>
