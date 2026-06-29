@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每月排班流程</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    font-weight: 300;
+    background: #ffffff;
+    min-height: 100vh;
+    padding: 52px 40px 80px;
+    color: #374151;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 400;
+    color: #374151;
+    margin-bottom: 6px;
+    letter-spacing: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 16px;
+    color: #9ca3af;
+    margin-bottom: 44px;
+    letter-spacing: 2px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 52px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 300;
+    color: #6b7280;
+  }
+  .legend-dot { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; }
+
+  /* Main flow column */
+  .flow {
+    max-width: 560px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Node */
+  .node {
+    width: 100%;
+    border-radius: 12px;
+    padding: 18px 28px;
+    font-size: 17px;
+    font-weight: 300;
+    line-height: 1.75;
+    position: relative;
+  }
+  .n-purple { background: #ede9fe; border: 2px solid #a78bfa; color: #4c1d95; }
+  .n-yellow { background: #fef9c3; border: 2px solid #facc15; color: #713f12; }
+  .n-orange { background: #ffedd5; border: 2px solid #fb923c; color: #7c2d12; }
+  .n-green  { background: #dcfce7; border: 2px solid #4ade80; color: #14532d; }
+
+  /* Date badge inside node */
+  .date-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 3px 12px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .n-purple .date-tag { background: #c4b5fd; color: #3b0764; }
+  .n-yellow .date-tag { background: #fde047; color: #713f12; }
+  .n-orange .date-tag { background: #fdba74; color: #7c2d12; }
+  .n-green  .date-tag { background: #86efac; color: #14532d; }
+
+  .flag { color: #ef4444; font-size: 14px; }
+
+  .node-title {
+    font-size: 18px;
+    font-weight: 400;
+  }
+
+  /* Descriptive note under title */
+  .node-note {
+    font-size: 14px;
+    font-weight: 300;
+    margin-top: 8px;
+    line-height: 1.7;
+    opacity: 0.85;
+  }
+
+  /* bullet list inside node */
+  .node-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 4px;
+  }
+  .node-list li {
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1.75;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .node-list li::before {
+    content: "·";
+    font-size: 20px;
+    opacity: 0.5;
+    flex-shrink: 0;
+  }
+
+  /* Arrow */
+  .arr {
+    width: 2px;
+    background: #cbd5e1;
+    position: relative;
+    align-self: center;
+    flex-shrink: 0;
+    height: 32px;
+  }
+  .arr::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 10px solid #94a3b8;
+  }
+
+  /* Note at bottom */
+  .note {
+    margin-top: 36px;
+    background: #fefce8;
+    border: 2px solid #facc15;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-size: 15px;
+    color: #713f12;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>每月排班流程</h1>
+<p class="subtitle">Monthly Scheduling Workflow</p>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#ede9fe; border:2px solid #a78bfa;"></div>起始作業
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#fef9c3; border:2px solid #facc15;"></div>排班確認
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#ffedd5; border:2px solid #fb923c;"></div>執行動作
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#dcfce7; border:2px solid #4ade80;"></div>完成輸出
+  </div>
+</div>
+
+<div class="flow">
+
+  <!-- 1 -->
+  <div class="node n-purple">
+    <div class="date-tag">1–15 日</div>
+    <div class="node-title">登記防治師下月休假</div>
+  </div>
+
+  <div class="arr"></div>
+
+  <!-- 2 -->
+  <div class="node n-yellow">
+    <div class="date-tag">15–18 日</div>
+    <div class="node-title">預排下月排班行事曆</div>
+    <div class="node-note">以上月班表為模板，依防治師休假日及客戶固定施作日期調整 🔒</div>
+  </div>
+
+  <div class="arr"></div>
+
+  <!-- 3 -->
+  <div class="node n-yellow">
+    <div class="date-tag">15–20 日 &nbsp;<span class="flag">▲</span></div>
+    <div class="node-title">詢問確認旅店施作日期</div>
+    <div class="node-note">詢問旅店所需施作日期，給予 3–5 天時間回覆（第一輪調整）🔒</div>
+  </div>
+
+  <div class="arr"></div>
+
+  <!-- 4 -->
+  <div class="node n-yellow">
+    <div class="date-tag">21–27 日 &nbsp;<span class="flag">▲</span></div>
+    <div class="node-title">確認其他客戶施作日期</div>
+    <div class="node-note">以已鎖定日期 🔒 為基礎，排列其餘客戶並確認是否需調整，給予約一週時間回覆（第二輪調整）</div>
+  </div>
+
+  <div class="arr"></div>
+
+  <!-- 5 -->
+  <div class="node n-orange">
+    <div class="date-tag">25 日 &nbsp;<span class="flag">▲</span></div>
+    <ul class="node-list">
+      <li>須提供下月施作日期給山崎</li>
+      <li>須提供下月施作日期給壽司郎</li>
+    </ul>
+    <div class="node-note">提供給客戶並確認或調整下月施作日期（第二輪調整）</div>
+  </div>
+
+  <div class="arr"></div>
+
+  <!-- 6 -->
+  <div class="node n-orange">
+    <div class="date-tag">25 日–月底</div>
+    <div class="node-title">必須先收到第一週所需進場單</div>
+    <div class="node-note">向下個月第一週有進場需求的客戶陸續收取進場單</div>
+  </div>
+
+  <div class="arr"></div>
+
+  <!-- 7 -->
+  <div class="node n-green">
+    <div class="date-tag">28–30 日 &nbsp;<span class="flag">▲</span></div>
+    <div class="node-title">匯出完整行程給資訊組<br>上傳下月任務行程</div>
+    <div class="node-note">請同仁確認行程是否有異常（第三輪調整）</div>
+  </div>
+
+  <div class="note">
+    <span class="flag">▲</span> 需調整 3 輪（配合客戶時間）
+  </div>
+
+</div>
+
+</body>
+</html>
